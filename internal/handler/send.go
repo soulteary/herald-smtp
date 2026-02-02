@@ -6,13 +6,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/soulteary/herald-smtp/internal/config"
 	"github.com/soulteary/herald-smtp/internal/idempotency"
-	"github.com/soulteary/herald-smtp/internal/smtp"
 	"github.com/soulteary/logger-kit"
 	"github.com/soulteary/provider-kit"
 )
 
+// smtpSender sends email; *smtp.Client implements it. Used for testing with mock.
+type smtpSender interface {
+	Send(ctx context.Context, msg *provider.Message) (*provider.SendResult, error)
+}
+
 // SendHandler handles POST /v1/send from Herald.
-func SendHandler(c *fiber.Ctx, smtpClient *smtp.Client, idemStore *idempotency.Store, log *logger.Logger) error {
+func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Store, log *logger.Logger) error {
 	if config.APIKey != "" && c.Get("X-API-Key") != config.APIKey {
 		log.Warn().Str("client_ip", c.IP()).Msg("send unauthorized: invalid or missing API key")
 		return c.Status(fiber.StatusUnauthorized).JSON(provider.HTTPSendResponse{
@@ -64,11 +68,7 @@ func SendHandler(c *fiber.Ctx, smtpClient *smtp.Client, idemStore *idempotency.S
 	if len(req.Params) > 0 {
 		msg.WithParams(req.Params)
 	}
-	var ctx context.Context = c.Context()
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	result, err := smtpClient.Send(ctx, msg)
+	result, err := smtpClient.Send(c.Context(), msg)
 	if err != nil {
 		log.Warn().Err(err).Str("to", req.To).Msg("send_failed: SMTP error")
 		if req.IdempotencyKey != "" {
