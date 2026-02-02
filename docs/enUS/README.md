@@ -1,0 +1,58 @@
+# Documentation Index
+
+Welcome to the herald-smtp documentation. herald-smtp is the SMTP email adapter for [Herald](https://github.com/soulteary/herald).
+
+## Multi-language Documentation
+
+- [English](README.md) | [中文](../zhCN/README.md)
+
+## Document List
+
+### Core Documents
+
+- **[README.md](../../README.md)** - Project overview and quick start guide
+
+### Detailed Documents
+
+- **[API.md](API.md)** - Complete API reference
+  - Base URL and authentication
+  - POST /v1/send request/response (to, subject, body)
+  - GET /healthz
+  - Error codes and HTTP status codes
+  - Idempotency
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deployment guide
+  - Binary and Docker run
+  - Configuration options
+  - Integration with Herald (HERALD_SMTP_API_URL)
+
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Troubleshooting guide
+  - Email not received
+  - 503 provider_down
+  - 401 unauthorized
+  - invalid_destination, send_failed
+  - Idempotency and logs
+
+- **[SECURITY.md](SECURITY.md)** - Security practices
+  - API Key usage
+  - SMTP credential management
+  - Production recommendations
+
+## Quick Navigation
+
+### Getting Started
+
+1. Read [README.md](../../README.md) to understand the project
+2. Check the [Quick Start](../../README.md#quick-start) section
+3. Refer to [DEPLOYMENT.md](DEPLOYMENT.md) for configuration and Herald integration
+
+### Developers
+
+1. Check [API.md](API.md) for the send contract and error codes
+2. Review [DEPLOYMENT.md](DEPLOYMENT.md) for deployment options
+
+### Operations
+
+1. Read [DEPLOYMENT.md](DEPLOYMENT.md) for deployment and Herald side config
+2. Refer to [SECURITY.md](SECURITY.md) for production practices
+3. Troubleshoot issues: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
