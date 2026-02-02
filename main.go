@@ -21,9 +21,9 @@ import (
 func showBanner() {
 	pterm.DefaultBox.Println(
 		putils.CenterText(
-			"Herald SMTP\n"+
-				"SMTP Email Provider for Herald\n"+
-				"Version: "+version.Version,
+			"Herald SMTP\n" +
+				"SMTP Email Provider for Herald\n" +
+				"Version: " + version.Version,
 		),
 	)
 	time.Sleep(time.Millisecond)
