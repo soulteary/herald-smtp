@@ -49,7 +49,7 @@ http://localhost:8084
 | `to` | string | 是 | 收件人邮箱地址。 |
 | `subject` | string | 否 | 邮件主题。为空时默认 "Verification code"。 |
 | `body` | string | 否 | 邮件正文。为空时见下方内容解析。 |
-| `idempotency_key` | string | 否 | 幂等键；TTL 内相同 key 返回缓存结果。 |
+| `idempotency_key` | string | 否 | 幂等键，最长 256 字节；TTL 内相同 key 和请求内容返回缓存结果。 |
 | `template` | string | 否 | 可选；当前实现未使用。 |
 | `params` | object | 否 | 若 `body` 为空且存在 `params.code`，正文为 "Your verification code is: " + params.code。 |
 | `locale` | string | 否 | 可选。 |
@@ -95,5 +95,6 @@ http://localhost:8084
 
 - 发送请求支持通过 `Idempotency-Key` 头或 body 字段 `idempotency_key` 实现幂等。
 - 在配置的 TTL（`IDEMPOTENCY_TTL_SECONDS`，默认 300）内，相同 key 的成功请求会返回缓存响应（相同 `ok`、`message_id`、`provider`），不再重复发送。
+- 使用相同 key 和内容的并发请求只触发一次 SMTP 发送，其余请求等待并复用首个成功结果。
 - 失败发送不会缓存，因此临时 SMTP 故障可使用同一 key 重试。
 - 缓存为内存；key 在 TTL 后过期。

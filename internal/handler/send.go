@@ -22,6 +22,8 @@ type smtpSender interface {
 	Send(ctx context.Context, msg *provider.Message) (*provider.SendResult, error)
 }
 
+const maxIdempotencyKeyBytes = 256
+
 // SendHandler handles POST /v1/send from Herald.
 func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Store, log *logger.Logger) error {
 	if !authorized(c) {
@@ -46,18 +48,34 @@ func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Sto
 	}
 
 	fingerprint := ""
+	reservationHeld := false
 	if req.IdempotencyKey != "" {
 		fingerprint = requestFingerprint(req)
-		if cached, hit, conflict := idemStore.Get(req.IdempotencyKey, fingerprint); conflict {
+		cached, decision, beginErr := idemStore.Begin(c.Context(), req.IdempotencyKey, fingerprint)
+		if beginErr != nil {
+			providerErr := provider.ErrSendFailed("idempotent request wait canceled", beginErr)
+			return sendFailure(c, nil, providerErr)
+		}
+		switch decision {
+		case idempotency.Conflict:
 			providerErr := provider.ErrIdempotencyConflict("idempotency key was already used for a different request")
 			return sendFailure(c, nil, providerErr)
-		} else if hit {
+		case idempotency.Hit:
 			log.Debug().Str("to", maskedDestination(req.To)).Bool("cached_ok", cached.OK).Str("message_id", cached.MessageID).Msg("send idempotent hit")
 			return c.JSON(provider.HTTPSendResponse{
 				OK: cached.OK, MessageID: cached.MessageID, Provider: "smtp",
 			})
+		case idempotency.Proceed:
+			reservationHeld = true
 		}
 	}
+	finishReservation := func(ok bool, messageID string) {
+		if reservationHeld {
+			idemStore.Finish(req.IdempotencyKey, fingerprint, ok, messageID)
+			reservationHeld = false
+		}
+	}
+	defer finishReservation(false, "")
 
 	result, err := smtpClient.Send(c.Context(), buildMessage(req))
 	if err != nil {
@@ -69,7 +87,7 @@ func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Sto
 	}
 
 	messageID := result.MessageID
-	cacheSuccess(idemStore, req.IdempotencyKey, fingerprint, messageID)
+	finishReservation(true, messageID)
 	log.Info().Str("to", maskedDestination(req.To)).Str("message_id", messageID).Msg("send ok")
 	return c.JSON(provider.HTTPSendResponse{
 		OK: true, MessageID: messageID, Provider: "smtp",
@@ -99,14 +117,10 @@ func parseRequest(c *fiber.Ctx) (provider.HTTPSendRequest, error) {
 	if req.IdempotencyKey == "" {
 		req.IdempotencyKey = headerKey
 	}
-	return req, nil
-}
-
-// cacheSuccess records a successful send when an idempotency key is present.
-func cacheSuccess(idemStore *idempotency.Store, key, fingerprint, messageID string) {
-	if key != "" {
-		idemStore.Set(key, fingerprint, true, messageID)
+	if len(req.IdempotencyKey) > maxIdempotencyKeyBytes {
+		return req, errors.New("idempotency key exceeds 256 bytes")
 	}
+	return req, nil
 }
 
 func requestFingerprint(req provider.HTTPSendRequest) string {
@@ -117,14 +131,15 @@ func requestFingerprint(req provider.HTTPSendRequest) string {
 }
 
 func maskedDestination(raw string) string {
-	if address, err := mail.ParseAddress(raw); err == nil {
-		raw = address.Address
+	address, err := mail.ParseAddress(raw)
+	if err != nil {
+		return "***"
 	}
-	at := strings.LastIndexByte(raw, '@')
+	at := strings.LastIndexByte(address.Address, '@')
 	if at <= 0 {
 		return "***"
 	}
-	return "***" + raw[at:]
+	return "***" + address.Address[at:]
 }
 
 // buildMessage constructs the provider message from the request, applying defaults.

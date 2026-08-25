@@ -19,7 +19,7 @@
 
 - **网络**：在私有网络中运行 herald-smtp。仅 Herald（或你的网关）应调用它；除非在 HTTPS 与严格访问控制之后，否则不要将 herald-smtp 直接暴露到公网。
 - **HTTPS**：若 herald-smtp 在互联网或不可信网络中可访问，应置于带 TLS 的反向代理（如 Traefik、nginx）之后。此时 Herald 的 `HERALD_SMTP_API_URL` 应使用 `https://`。
-- **最小权限**：使用非 root 用户运行进程；在 Docker 中尽可能使用非 root 用户镜像。
+- **最小权限**：使用非 root 用户运行进程；项目提供的 Docker 镜像使用专用的 `herald` 用户。
 - **日志**：避免记录可能包含敏感信息的请求体或请求头。结构化日志（如脱敏的 `to`、`message_id`、错误码）足以满足运维与排障。
 
 ## 小结

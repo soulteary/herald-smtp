@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/soulteary/herald-smtp/internal/config"
@@ -349,6 +352,24 @@ func TestSendHandler_RejectsConflictingIdempotencyKeys(t *testing.T) {
 	}
 }
 
+func TestSendHandler_RejectsOversizedIdempotencyKey(t *testing.T) {
+	mock := &mockSender{}
+	app := testApp(mock)
+	body, _ := json.Marshal(provider.HTTPSendRequest{
+		To:             "u@example.com",
+		IdempotencyKey: strings.Repeat("k", maxIdempotencyKeyBytes+1),
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
 func TestSendHandler_IdempotencyKeyContentConflict(t *testing.T) {
 	calls := 0
 	mock := &mockSender{sendFunc: func(context.Context, *provider.Message) (*provider.SendResult, error) {
@@ -387,12 +408,66 @@ func TestSendHandler_IdempotencyKeyContentConflict(t *testing.T) {
 	}
 }
 
+func TestSendHandler_ConcurrentIdempotentRequestsSendOnce(t *testing.T) {
+	var calls atomic.Int32
+	started := make(chan struct{})
+	release := make(chan struct{})
+	mock := &mockSender{sendFunc: func(context.Context, *provider.Message) (*provider.SendResult, error) {
+		if calls.Add(1) == 1 {
+			close(started)
+		}
+		<-release
+		return provider.NewSuccessResult("smtp", provider.ChannelEmail, "msg-concurrent"), nil
+	}}
+	app := testApp(mock)
+	body, _ := json.Marshal(provider.HTTPSendRequest{To: "u@example.com", IdempotencyKey: "concurrent-key"})
+	send := func(result chan<- *http.Response) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			result <- nil
+			return
+		}
+		result <- resp
+	}
+
+	responses := make(chan *http.Response, 2)
+	go send(responses)
+	<-started
+	go send(responses)
+	time.Sleep(25 * time.Millisecond)
+	if got := calls.Load(); got != 1 {
+		close(release)
+		t.Fatalf("concurrent Send() calls before release = %d, want 1", got)
+	}
+	close(release)
+	for range 2 {
+		resp := <-responses
+		if resp == nil || resp.StatusCode != http.StatusOK {
+			t.Fatalf("concurrent response = %#v, want HTTP 200", resp)
+		}
+		var out provider.HTTPSendResponse
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		if !out.OK || out.MessageID != "msg-concurrent" {
+			t.Errorf("concurrent response body = %#v", out)
+		}
+	}
+	if got := calls.Load(); got != 1 {
+		t.Errorf("concurrent Send() calls = %d, want 1", got)
+	}
+}
+
 func TestMaskedDestination(t *testing.T) {
 	tests := map[string]string{
-		"user@example.com":     "***@example.com",
-		"A <user@example.com>": "***@example.com",
-		"x@example.com":        "***@example.com",
-		"not-an-email":         "***",
+		"user@example.com":              "***@example.com",
+		"A <user@example.com>":          "***@example.com",
+		"x@example.com":                 "***@example.com",
+		"not-an-email":                  "***",
+		"user@example.com secret-token": "***",
+		"local":                         "***",
 	}
 	for input, want := range tests {
 		if got := maskedDestination(input); got != want {
