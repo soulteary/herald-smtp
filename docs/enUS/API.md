@@ -49,7 +49,7 @@ Send an email via SMTP. Called by Herald when channel is `email` and `HERALD_SMT
 | `to` | string | Yes | Recipient email address. |
 | `subject` | string | No | Email subject. Defaults to "Verification code" if empty. |
 | `body` | string | No | Email body. If empty, see content resolution below. |
-| `idempotency_key` | string | No | Idempotency key; same key within TTL returns cached result. |
+| `idempotency_key` | string | No | Idempotency key, maximum 256 bytes; the same key and request content within the TTL returns the cached result. |
 | `template` | string | No | Optional; not used for content in current implementation. |
 | `params` | object | No | If `body` is empty and `params.code` exists, content becomes "Your verification code is: " + params.code. |
 | `locale` | string | No | Optional. |
@@ -95,5 +95,6 @@ Send an email via SMTP. Called by Herald when channel is `email` and `HERALD_SMT
 
 - Send requests support idempotency via `Idempotency-Key` header or body field `idempotency_key`.
 - Within the configured TTL (`IDEMPOTENCY_TTL_SECONDS`, default 300), a repeated successful request with the same key returns the cached response (same `ok`, `message_id`, `provider`) without sending again.
+- Concurrent requests with the same key and content share one SMTP send; followers wait for and reuse the first successful result.
 - Failed sends are not cached, allowing transient SMTP failures to be retried with the same key.
 - Cache is in-memory; key expires after TTL.

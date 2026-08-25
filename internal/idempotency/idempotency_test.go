@@ -1,101 +1,146 @@
 package idempotency
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 )
 
 func TestNewStore(t *testing.T) {
-	s := NewStore(60)
-	if s == nil {
-		t.Fatal("NewStore(60) returned nil")
-	}
-	s0 := NewStore(0)
-	if s0 == nil {
-		t.Fatal("NewStore(0) returned nil")
+	for _, ttl := range []int{60, 0} {
+		if store := NewStore(ttl); store == nil {
+			t.Fatalf("NewStore(%d) returned nil", ttl)
+		}
 	}
 }
 
-func TestStore_SetAndGetHit(t *testing.T) {
-	s := NewStore(300)
-	key := "idem-key-1"
-	s.Set(key, "request-1", true, "msg-123")
-	c, hit, conflict := s.Get(key, "request-1")
-	if !hit {
-		t.Fatal("expected hit after Set")
+func TestStore_BeginFinishAndHit(t *testing.T) {
+	store := NewStore(300)
+	value, decision, err := store.Begin(context.Background(), "key", "request-1")
+	if err != nil || decision != Proceed {
+		t.Fatalf("Begin() = (%#v, %v, %v), want Proceed", value, decision, err)
 	}
-	if conflict {
-		t.Fatal("matching request should not conflict")
+	store.Finish("key", "request-1", true, "msg-123")
+
+	value, decision, err = store.Begin(context.Background(), "key", "request-1")
+	if err != nil || decision != Hit {
+		t.Fatalf("Begin() = (%#v, %v, %v), want Hit", value, decision, err)
 	}
-	if !c.OK || c.MessageID != "msg-123" {
-		t.Errorf("got OK=%v MessageID=%q, want OK=true MessageID=msg-123", c.OK, c.MessageID)
+	if !value.OK || value.MessageID != "msg-123" {
+		t.Errorf("cached value = %#v, want successful msg-123", value)
 	}
 }
 
-func TestStore_GetMissNoSet(t *testing.T) {
-	s := NewStore(300)
-	_, hit, conflict := s.Get("nonexistent", "request")
-	if hit {
-		t.Fatal("expected miss for key never set")
+func TestStore_FailedReservationCanRetry(t *testing.T) {
+	store := NewStore(300)
+	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("first Begin() decision = %v, error = %v", decision, err)
 	}
-	if conflict {
-		t.Fatal("missing key should not conflict")
+	store.Finish("key", "request-1", false, "")
+	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("retry Begin() decision = %v, error = %v, want Proceed", decision, err)
+	}
+	store.Finish("key", "request-1", false, "")
+}
+
+func TestStore_Conflict(t *testing.T) {
+	store := NewStore(300)
+	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("first Begin() decision = %v, error = %v", decision, err)
+	}
+	if _, decision, err := store.Begin(context.Background(), "key", "request-2"); err != nil || decision != Conflict {
+		t.Fatalf("conflicting Begin() decision = %v, error = %v, want Conflict", decision, err)
+	}
+	store.Finish("key", "request-1", false, "")
+}
+
+func TestStore_ConcurrentDuplicateWaitsForOwner(t *testing.T) {
+	store := NewStore(300)
+	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("owner Begin() decision = %v, error = %v", decision, err)
+	}
+
+	type beginResult struct {
+		value    cached
+		decision Decision
+		err      error
+	}
+	resultCh := make(chan beginResult, 1)
+	go func() {
+		value, decision, err := store.Begin(context.Background(), "key", "request-1")
+		resultCh <- beginResult{value: value, decision: decision, err: err}
+	}()
+	select {
+	case result := <-resultCh:
+		t.Fatalf("duplicate returned before owner finished: %#v", result)
+	case <-time.After(25 * time.Millisecond):
+	}
+
+	store.Finish("key", "request-1", true, "msg-123")
+	select {
+	case result := <-resultCh:
+		if result.err != nil || result.decision != Hit || result.value.MessageID != "msg-123" {
+			t.Fatalf("duplicate result = %#v, want cached hit", result)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("duplicate did not resume after owner finished")
 	}
 }
 
-func TestStore_GetMissAfterExpiry(t *testing.T) {
-	s := NewStore(1) // 1 second TTL
-	key := "expire-key"
-	s.Set(key, "request-1", true, "msg-456")
-	if _, hit, _ := s.Get(key, "request-1"); !hit {
-		t.Fatal("expected hit immediately after Set")
+func TestStore_WaitHonorsContextCancellation(t *testing.T) {
+	store := NewStore(300)
+	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("owner Begin() decision = %v, error = %v", decision, err)
 	}
-	time.Sleep(2 * time.Second)
-	_, hit, conflict := s.Get(key, "request-1")
-	if hit {
-		t.Fatal("expected miss after TTL expiry")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, _, err := store.Begin(ctx, "key", "request-1"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("waiting Begin() error = %v, want context.Canceled", err)
 	}
-	if conflict {
-		t.Fatal("expired key should not conflict")
-	}
-	if _, exists := s.m[key]; exists {
-		t.Fatal("expired key should be removed")
-	}
+	store.Finish("key", "request-1", false, "")
 }
 
-func TestStore_SetFailureThenGet(t *testing.T) {
-	s := NewStore(300)
-	key := "fail-key"
-	s.Set(key, "request-1", false, "")
-	c, hit, conflict := s.Get(key, "request-1")
-	if !hit {
-		t.Fatal("expected hit for cached failure")
+func TestStore_ExpiredEntryCanBeReused(t *testing.T) {
+	store := NewStore(300)
+	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("Begin() decision = %v, error = %v", decision, err)
 	}
-	if conflict {
-		t.Fatal("matching failed request should not conflict")
+	store.Finish("key", "request-1", true, "msg-old")
+	entry := store.m["key"]
+	entry.expiresAt = time.Now().Add(-time.Second)
+	store.m["key"] = entry
+
+	if _, decision, err := store.Begin(context.Background(), "key", "request-2"); err != nil || decision != Proceed {
+		t.Fatalf("expired Begin() decision = %v, error = %v, want Proceed", decision, err)
 	}
-	if c.OK || c.MessageID != "" {
-		t.Errorf("got OK=%v MessageID=%q, want OK=false MessageID=", c.OK, c.MessageID)
-	}
+	store.Finish("key", "request-2", false, "")
 }
 
-func TestStore_GetConflict(t *testing.T) {
-	s := NewStore(300)
-	s.Set("same-key", "request-1", true, "msg-123")
-	if _, hit, conflict := s.Get("same-key", "request-2"); hit || !conflict {
-		t.Fatalf("Get() hit=%v conflict=%v, want false, true", hit, conflict)
+func TestStore_BeginCleansExpiredEntries(t *testing.T) {
+	store := NewStore(300)
+	store.m["expired"] = entry{complete: true, expiresAt: time.Now().Add(-time.Second)}
+	store.nextCleanup = time.Time{}
+	if _, decision, err := store.Begin(context.Background(), "new", "request"); err != nil || decision != Proceed {
+		t.Fatalf("Begin() decision = %v, error = %v", decision, err)
 	}
+	if _, exists := store.m["expired"]; exists {
+		t.Fatal("Begin() should remove expired entries during scheduled cleanup")
+	}
+	store.Finish("new", "request", false, "")
 }
 
-func TestStore_SetCleansExpiredEntries(t *testing.T) {
-	s := NewStore(300)
-	s.m["expired"] = entry{expiresAt: time.Now().Add(-time.Second)}
-	s.nextCleanup = time.Time{}
-	s.Set("new", "request", true, "msg-new")
-	if _, exists := s.m["expired"]; exists {
-		t.Fatal("Set() should remove expired entries during scheduled cleanup")
+func TestStore_FinishIgnoresUnknownOrMismatchedReservation(t *testing.T) {
+	store := NewStore(300)
+	store.Finish("missing", "request", true, "msg")
+	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("Begin() decision = %v, error = %v", decision, err)
 	}
-	if _, exists := s.m["new"]; !exists {
-		t.Fatal("Set() should retain the new entry")
+	store.Finish("key", "request-2", true, "msg")
+	store.Finish("key", "request-1", true, "msg")
+	store.Finish("key", "request-1", true, "other")
+	value, decision, err := store.Begin(context.Background(), "key", "request-1")
+	if err != nil || decision != Hit || value.MessageID != "msg" {
+		t.Fatalf("cached result = (%#v, %v, %v), want original hit", value, decision, err)
 	}
 }

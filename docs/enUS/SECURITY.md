@@ -19,7 +19,7 @@ This document describes security considerations and recommendations for herald-s
 
 - **Network**: Run herald-smtp in a private network. Only Herald (or your gateway) should call it; do not expose herald-smtp directly to the public internet unless behind HTTPS and strict access control.
 - **HTTPS**: If herald-smtp is reachable over the internet or across untrusted networks, put it behind a reverse proxy (e.g. Traefik, nginx) with TLS. Herald should use `https://` for `HERALD_SMTP_API_URL` in that case.
-- **Least privilege**: Run the process with a non-root user; in Docker, use a non-root user in the image if possible.
+- **Least privilege**: Run the process with a non-root user. The provided Docker image uses the dedicated `herald` user.
 - **Logging**: Avoid logging request bodies or headers that may contain secrets. Structured logs (e.g. masked `to`, `message_id`, error codes) are sufficient for operations and troubleshooting.
 
 ## Summary

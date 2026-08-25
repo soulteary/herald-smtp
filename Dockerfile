@@ -18,5 +18,7 @@ RUN BUILD_DATE=${BUILD_DATE:-$(date +%FT%T%z)} && \
 FROM alpine:3.23
 RUN apk add --no-cache ca-certificates curl
 COPY --from=builder /app/herald-smtp /bin/herald-smtp
+RUN addgroup -S herald && adduser -S -G herald herald
+USER herald
 EXPOSE 8084
 CMD ["herald-smtp"]
