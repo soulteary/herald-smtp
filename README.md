@@ -14,7 +14,8 @@ SMTP email adapter for [Herald](https://github.com/soulteary/herald). Herald for
 
 - **Herald HTTP Provider contract**: Implements the same HTTP send contract as Herald's external provider; request/response align with [provider-kit](https://github.com/soulteary/provider-kit) `HTTPSendRequest` / `HTTPSendResponse`.
 - **Optional API Key auth**: When `API_KEY` is set, Herald must send `X-API-Key`; otherwise no auth required.
-- **Idempotency**: Supports `Idempotency-Key` (or body `idempotency_key`); same key within TTL returns cached result without sending again.
+- **Idempotency**: Supports `Idempotency-Key` (or body `idempotency_key`); a successful request repeated with the same key and content within the TTL returns the cached result without sending again.
+- **SMTP transport modes**: Supports plaintext SMTP, STARTTLS, and implicit TLS with bounded send timeouts.
 - **Graceful shutdown**: On `SIGINT` or `SIGTERM`, server stops accepting new requests and shuts down with a 10s timeout.
 
 ## Architecture
@@ -58,9 +59,15 @@ sequenceDiagram
 | `SMTP_USER` | SMTP username | `` | No (if server allows anonymous) |
 | `SMTP_PASSWORD` | SMTP password | `` | No |
 | `SMTP_FROM` | Sender email address | `` | Yes (for send) |
+| `SMTP_FROM_NAME` | Optional sender display name | `` | No |
+| `SMTP_USE_TLS` | Use implicit TLS (typically port 465) | `false` | No |
 | `SMTP_USE_STARTTLS` | Use STARTTLS | `true` | No |
+| `SMTP_SKIP_TLS_VERIFY` | Skip certificate verification; development only | `false` | No |
+| `SMTP_TIMEOUT_SECONDS` | End-to-end SMTP send timeout | `30` | No |
 | `LOG_LEVEL` | Log level: trace, debug, info, warn, error | `info` | No |
 | `IDEMPOTENCY_TTL_SECONDS` | Idempotency cache TTL (seconds) | `300` | No |
+
+`SMTP_USE_TLS` and `SMTP_USE_STARTTLS` are mutually exclusive. For implicit TLS, set `SMTP_USE_TLS=true` and `SMTP_USE_STARTTLS=false`.
 
 ## Herald side
 

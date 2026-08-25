@@ -6,16 +6,20 @@ import (
 )
 
 type entry struct {
-	ok        bool
-	messageID string
-	expiresAt time.Time
+	fingerprint string
+	ok          bool
+	messageID   string
+	expiresAt   time.Time
 }
 
-// Store is an in-memory idempotency store. Same key within TTL returns cached response.
+// Store is an in-memory idempotency store. The same key and request fingerprint
+// within the TTL returns a cached response; mismatched fingerprints conflict.
 type Store struct {
-	mu     sync.RWMutex
-	m      map[string]entry
-	ttlSec int
+	mu              sync.RWMutex
+	m               map[string]entry
+	ttlSec          int
+	cleanupInterval time.Duration
+	nextCleanup     time.Time
 }
 
 // NewStore creates a store with the given TTL in seconds.
@@ -24,6 +28,11 @@ func NewStore(ttlSec int) *Store {
 	if s.ttlSec <= 0 {
 		s.ttlSec = 300
 	}
+	s.cleanupInterval = time.Duration(s.ttlSec) * time.Second
+	if s.cleanupInterval > time.Minute {
+		s.cleanupInterval = time.Minute
+	}
+	s.nextCleanup = time.Now().Add(s.cleanupInterval)
 	return s
 }
 
@@ -32,24 +41,42 @@ type cached struct {
 	MessageID string
 }
 
-// Get returns cached result for key if not expired. ok=false means miss.
-func (s *Store) Get(key string) (cached, bool) {
-	s.mu.RLock()
+// Get returns a cached result for an unexpired matching request. conflict is
+// true when the same key was already used for different request content.
+func (s *Store) Get(key, fingerprint string) (cached, bool, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	e, ok := s.m[key]
-	s.mu.RUnlock()
-	if !ok || time.Now().After(e.expiresAt) {
-		return cached{}, false
+	if !ok {
+		return cached{}, false, false
 	}
-	return cached{OK: e.ok, MessageID: e.messageID}, true
+	if time.Now().After(e.expiresAt) {
+		delete(s.m, key)
+		return cached{}, false, false
+	}
+	if e.fingerprint != fingerprint {
+		return cached{}, false, true
+	}
+	return cached{OK: e.ok, MessageID: e.messageID}, true, false
 }
 
 // Set stores the result for key with TTL.
-func (s *Store) Set(key string, ok bool, messageID string) {
+func (s *Store) Set(key, fingerprint string, ok bool, messageID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	now := time.Now()
+	if !now.Before(s.nextCleanup) {
+		for storedKey, storedEntry := range s.m {
+			if now.After(storedEntry.expiresAt) {
+				delete(s.m, storedKey)
+			}
+		}
+		s.nextCleanup = now.Add(s.cleanupInterval)
+	}
 	s.m[key] = entry{
-		ok:        ok,
-		messageID: messageID,
-		expiresAt: time.Now().Add(time.Duration(s.ttlSec) * time.Second),
+		fingerprint: fingerprint,
+		ok:          ok,
+		messageID:   messageID,
+		expiresAt:   now.Add(time.Duration(s.ttlSec) * time.Second),
 	}
 }

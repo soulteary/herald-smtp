@@ -75,9 +75,15 @@ services:
 | `SMTP_USER` | SMTP username | `` | No (if server allows anonymous) |
 | `SMTP_PASSWORD` | SMTP password | `` | No |
 | `SMTP_FROM` | Sender email address | `` | Yes (for send) |
+| `SMTP_FROM_NAME` | Optional sender display name | `` | No |
+| `SMTP_USE_TLS` | Use implicit TLS (typically port 465) | `false` | No |
 | `SMTP_USE_STARTTLS` | Use STARTTLS | `true` | No |
+| `SMTP_SKIP_TLS_VERIFY` | Skip certificate verification; development only | `false` | No |
+| `SMTP_TIMEOUT_SECONDS` | End-to-end SMTP send timeout | `30` | No |
 | `LOG_LEVEL` | Log level: trace, debug, info, warn, error | `info` | No |
 | `IDEMPOTENCY_TTL_SECONDS` | Idempotency cache TTL in seconds | `300` | No |
+
+`SMTP_USE_TLS` and `SMTP_USE_STARTTLS` are mutually exclusive. For implicit TLS, set `SMTP_USE_TLS=true` and `SMTP_USE_STARTTLS=false`.
 
 When `SMTP_HOST` or `SMTP_FROM` is missing, `POST /v1/send` returns `503` with `error_code: "provider_down"`.
 

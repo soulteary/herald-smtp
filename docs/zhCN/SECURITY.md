@@ -11,6 +11,7 @@
 ## SMTP 凭证
 
 - **SMTP_HOST**、**SMTP_USER**、**SMTP_PASSWORD**、**SMTP_FROM** 不得硬编码或提交到仓库。
+- 生产环境应保持 `SMTP_SKIP_TLS_VERIFY=false`。跳过证书校验会使 SMTP 连接面临中间人攻击。
 - 将其存放在环境变量或密钥管理服务（如 Kubernetes Secrets、HashiCorp Vault）中。仅将 `.env` 用于本地开发，并确保 `.env` 在 `.gitignore` 中。
 - 定期轮换 SMTP 密码并更新 herald-smtp 配置。
 

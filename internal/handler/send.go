@@ -2,6 +2,13 @@ package handler
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"net/mail"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/soulteary/herald-smtp/internal/config"
@@ -38,9 +45,14 @@ func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Sto
 		})
 	}
 
+	fingerprint := ""
 	if req.IdempotencyKey != "" {
-		if cached, hit := idemStore.Get(req.IdempotencyKey); hit {
-			log.Debug().Str("to", req.To).Bool("cached_ok", cached.OK).Str("message_id", cached.MessageID).Msg("send idempotent hit")
+		fingerprint = requestFingerprint(req)
+		if cached, hit, conflict := idemStore.Get(req.IdempotencyKey, fingerprint); conflict {
+			providerErr := provider.ErrIdempotencyConflict("idempotency key was already used for a different request")
+			return sendFailure(c, nil, providerErr)
+		} else if hit {
+			log.Debug().Str("to", maskedDestination(req.To)).Bool("cached_ok", cached.OK).Str("message_id", cached.MessageID).Msg("send idempotent hit")
 			return c.JSON(provider.HTTPSendResponse{
 				OK: cached.OK, MessageID: cached.MessageID, Provider: "smtp",
 			})
@@ -49,23 +61,16 @@ func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Sto
 
 	result, err := smtpClient.Send(c.Context(), buildMessage(req))
 	if err != nil {
-		log.Warn().Err(err).Str("to", req.To).Msg("send_failed: SMTP error")
-		setIdempotent(idemStore, req.IdempotencyKey, false, "")
-		return c.Status(fiber.StatusInternalServerError).JSON(provider.HTTPSendResponse{
-			OK: false, ErrorCode: "send_failed", ErrorMessage: err.Error(),
-		})
+		log.Warn().Err(err).Str("to", maskedDestination(req.To)).Msg("send_failed: SMTP error")
+		return sendFailure(c, result, err)
 	}
 	if result == nil || !result.OK {
-		errCode, errMsg := resultError(result)
-		setIdempotent(idemStore, req.IdempotencyKey, false, "")
-		return c.Status(fiber.StatusInternalServerError).JSON(provider.HTTPSendResponse{
-			OK: false, ErrorCode: errCode, ErrorMessage: errMsg,
-		})
+		return sendFailure(c, result, nil)
 	}
 
 	messageID := result.MessageID
-	setIdempotent(idemStore, req.IdempotencyKey, true, messageID)
-	log.Info().Str("to", req.To).Str("message_id", messageID).Msg("send ok")
+	cacheSuccess(idemStore, req.IdempotencyKey, fingerprint, messageID)
+	log.Info().Str("to", maskedDestination(req.To)).Str("message_id", messageID).Msg("send ok")
 	return c.JSON(provider.HTTPSendResponse{
 		OK: true, MessageID: messageID, Provider: "smtp",
 	})
@@ -73,7 +78,12 @@ func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Sto
 
 // authorized reports whether the request carries a valid API key (or auth is disabled).
 func authorized(c *fiber.Ctx) bool {
-	return config.APIKey == "" || c.Get("X-API-Key") == config.APIKey
+	if config.APIKey == "" {
+		return true
+	}
+	actual := sha256.Sum256([]byte(c.Get("X-API-Key")))
+	expected := sha256.Sum256([]byte(config.APIKey))
+	return subtle.ConstantTimeCompare(actual[:], expected[:]) == 1
 }
 
 // parseRequest parses the send request body and resolves the idempotency key from the header.
@@ -82,17 +92,39 @@ func parseRequest(c *fiber.Ctx) (provider.HTTPSendRequest, error) {
 	if err := c.BodyParser(&req); err != nil {
 		return req, err
 	}
+	headerKey := c.Get("Idempotency-Key")
+	if req.IdempotencyKey != "" && headerKey != "" && req.IdempotencyKey != headerKey {
+		return req, errors.New("conflicting idempotency keys in body and header")
+	}
 	if req.IdempotencyKey == "" {
-		req.IdempotencyKey = c.Get("Idempotency-Key")
+		req.IdempotencyKey = headerKey
 	}
 	return req, nil
 }
 
-// setIdempotent records the send outcome when an idempotency key is present.
-func setIdempotent(idemStore *idempotency.Store, key string, ok bool, messageID string) {
+// cacheSuccess records a successful send when an idempotency key is present.
+func cacheSuccess(idemStore *idempotency.Store, key, fingerprint, messageID string) {
 	if key != "" {
-		idemStore.Set(key, ok, messageID)
+		idemStore.Set(key, fingerprint, true, messageID)
 	}
+}
+
+func requestFingerprint(req provider.HTTPSendRequest) string {
+	req.IdempotencyKey = ""
+	payload, _ := json.Marshal(req)
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:])
+}
+
+func maskedDestination(raw string) string {
+	if address, err := mail.ParseAddress(raw); err == nil {
+		raw = address.Address
+	}
+	at := strings.LastIndexByte(raw, '@')
+	if at <= 0 {
+		return "***"
+	}
+	return "***" + raw[at:]
 }
 
 // buildMessage constructs the provider message from the request, applying defaults.
@@ -121,10 +153,44 @@ func buildMessage(req provider.HTTPSendRequest) *provider.Message {
 	return msg
 }
 
-// resultError extracts the error code and message from a failed send result.
-func resultError(result *provider.SendResult) (string, string) {
+// sendFailure preserves provider-kit error reasons in the HTTP response and
+// maps them to retry-friendly status codes. Failed sends are deliberately not
+// cached so callers can retry transient SMTP failures with the same key.
+func sendFailure(c *fiber.Ctx, result *provider.SendResult, sendErr error) error {
+	reason := provider.ReasonSendFailed
+	message := ""
 	if result != nil && result.Error != nil {
-		return string(result.Error.Reason), result.Error.Message
+		reason = result.Error.Reason
+		message = result.Error.Message
+	} else {
+		var providerErr *provider.ProviderError
+		if errors.As(sendErr, &providerErr) {
+			reason = providerErr.Reason
+			message = providerErr.Message
+		} else if sendErr != nil {
+			message = sendErr.Error()
+		}
 	}
-	return "send_failed", ""
+	return c.Status(statusForReason(reason)).JSON(provider.HTTPSendResponse{
+		OK: false, ErrorCode: string(reason), ErrorMessage: message,
+	})
+}
+
+func statusForReason(reason provider.ErrorReason) int {
+	switch reason {
+	case provider.ReasonInvalidDestination, provider.ReasonValidationFailed:
+		return fiber.StatusBadRequest
+	case provider.ReasonUnauthorized:
+		return fiber.StatusUnauthorized
+	case provider.ReasonIdempotencyConflict:
+		return fiber.StatusConflict
+	case provider.ReasonRateLimited:
+		return fiber.StatusTooManyRequests
+	case provider.ReasonTimeout:
+		return fiber.StatusGatewayTimeout
+	case provider.ReasonProviderDown, provider.ReasonInvalidConfig, provider.ReasonNotRegistered:
+		return fiber.StatusServiceUnavailable
+	default:
+		return fiber.StatusInternalServerError
+	}
 }

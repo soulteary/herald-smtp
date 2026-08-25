@@ -144,9 +144,10 @@ func TestSendHandler_SendError(t *testing.T) {
 }
 
 func TestSendHandler_SendErrorWithIdempotencyKey(t *testing.T) {
-	// Error path with IdempotencyKey: idemStore.Set(key, false, "") is called
+	calls := 0
 	mock := &mockSender{
 		sendFunc: func(ctx context.Context, msg *provider.Message) (*provider.SendResult, error) {
+			calls++
 			return nil, context.DeadlineExceeded
 		},
 	}
@@ -163,17 +164,59 @@ func TestSendHandler_SendErrorWithIdempotencyKey(t *testing.T) {
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Errorf("status = %d, want 500", resp.StatusCode)
 	}
-	// Retry with same key should get cached failure
+	// Transient failures are not cached, so the same key can be retried.
 	req2 := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
 	resp2, _ := app.Test(req2, -1)
-	if resp2.StatusCode != http.StatusOK {
-		t.Errorf("cached failure response status = %d (expect 200 with ok:false)", resp2.StatusCode)
+	if resp2.StatusCode != http.StatusInternalServerError {
+		t.Errorf("retry response status = %d, want 500", resp2.StatusCode)
 	}
-	var out provider.HTTPSendResponse
-	_ = json.NewDecoder(resp2.Body).Decode(&out)
-	if out.OK {
-		t.Error("cached response should be ok=false")
+	if calls != 2 {
+		t.Errorf("Send() calls = %d, want 2 retries", calls)
+	}
+}
+
+func TestSendHandler_MapsProviderErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		err    *provider.ProviderError
+		status int
+	}{
+		{name: "invalid destination", err: provider.ErrInvalidDestination("invalid recipient"), status: http.StatusBadRequest},
+		{name: "validation", err: provider.ErrValidationFailed("invalid subject"), status: http.StatusBadRequest},
+		{name: "timeout", err: provider.ErrTimeout("SMTP send timed out", context.DeadlineExceeded), status: http.StatusGatewayTimeout},
+		{name: "provider down", err: provider.ErrProviderDown("SMTP unavailable", nil), status: http.StatusServiceUnavailable},
+		{name: "invalid config", err: provider.ErrInvalidConfig("bad config"), status: http.StatusServiceUnavailable},
+		{name: "rate limited", err: provider.ErrRateLimited("slow down"), status: http.StatusTooManyRequests},
+		{name: "unauthorized", err: provider.ErrUnauthorized("bad credentials"), status: http.StatusUnauthorized},
+		{name: "idempotency conflict", err: provider.ErrIdempotencyConflict("key reused"), status: http.StatusConflict},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockSender{sendFunc: func(context.Context, *provider.Message) (*provider.SendResult, error) {
+				result := provider.NewFailureResult("smtp", provider.ChannelEmail, tt.err)
+				return result, tt.err
+			}}
+			app := testApp(mock)
+			body, _ := json.Marshal(provider.HTTPSendRequest{To: "u@example.com"})
+			req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := app.Test(req, -1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != tt.status {
+				t.Fatalf("status = %d, want %d", resp.StatusCode, tt.status)
+			}
+			var out provider.HTTPSendResponse
+			if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+				t.Fatal(err)
+			}
+			if out.ErrorCode != string(tt.err.Reason) || out.ErrorMessage != tt.err.Message {
+				t.Errorf("response = %#v, want reason %q message %q", out, tt.err.Reason, tt.err.Message)
+			}
+		})
 	}
 }
 
@@ -286,6 +329,75 @@ func TestSendHandler_IdempotencyKeyFromHeader(t *testing.T) {
 	_ = json.NewDecoder(resp2.Body).Decode(&out)
 	if !out.OK || out.MessageID != "hdr-msg" {
 		t.Errorf("cached response OK=%v message_id=%q", out.OK, out.MessageID)
+	}
+}
+
+func TestSendHandler_RejectsConflictingIdempotencyKeys(t *testing.T) {
+	mock := &mockSender{}
+	app := testApp(mock)
+	body, _ := json.Marshal(provider.HTTPSendRequest{To: "u@example.com", IdempotencyKey: "body-key"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "header-key")
+
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestSendHandler_IdempotencyKeyContentConflict(t *testing.T) {
+	calls := 0
+	mock := &mockSender{sendFunc: func(context.Context, *provider.Message) (*provider.SendResult, error) {
+		calls++
+		return provider.NewSuccessResult("smtp", provider.ChannelEmail, "msg-123"), nil
+	}}
+	app := testApp(mock)
+
+	firstBody, _ := json.Marshal(provider.HTTPSendRequest{To: "first@example.com", IdempotencyKey: "same-key"})
+	first := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(firstBody))
+	first.Header.Set("Content-Type", "application/json")
+	firstResp, err := app.Test(first, -1)
+	if err != nil || firstResp.StatusCode != http.StatusOK {
+		t.Fatalf("first request status = %d, error = %v", firstResp.StatusCode, err)
+	}
+
+	secondBody, _ := json.Marshal(provider.HTTPSendRequest{To: "second@example.com", IdempotencyKey: "same-key"})
+	second := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(secondBody))
+	second.Header.Set("Content-Type", "application/json")
+	secondResp, err := app.Test(second, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secondResp.StatusCode != http.StatusConflict {
+		t.Fatalf("second request status = %d, want 409", secondResp.StatusCode)
+	}
+	var out provider.HTTPSendResponse
+	if err := json.NewDecoder(secondResp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.ErrorCode != string(provider.ReasonIdempotencyConflict) {
+		t.Errorf("error_code = %q, want idempotency_conflict", out.ErrorCode)
+	}
+	if calls != 1 {
+		t.Errorf("Send() calls = %d, want 1", calls)
+	}
+}
+
+func TestMaskedDestination(t *testing.T) {
+	tests := map[string]string{
+		"user@example.com":     "***@example.com",
+		"A <user@example.com>": "***@example.com",
+		"x@example.com":        "***@example.com",
+		"not-an-email":         "***",
+	}
+	for input, want := range tests {
+		if got := maskedDestination(input); got != want {
+			t.Errorf("maskedDestination(%q) = %q, want %q", input, got, want)
+		}
 	}
 }
 

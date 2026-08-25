@@ -84,11 +84,16 @@ http://localhost:8084
 | `unauthorized` | 401 | 已配置 `API_KEY` 但未传或错误的 `X-API-Key`。 |
 | `invalid_request` | 400 | 请求体解析失败（无效 JSON）。 |
 | `invalid_destination` | 400 | `to` 缺失或为空。 |
+| `validation_failed` | 400 | 收件地址或邮件头校验失败。 |
+| `idempotency_conflict` | 409 | 幂等键与已有请求冲突。 |
+| `rate_limited` | 429 | 上游服务触发限流。 |
 | `provider_down` | 503 | 未配置 SMTP（SMTP_HOST / SMTP_FROM 未设置）。 |
+| `timeout` | 504 | SMTP 发送超过截止时间。 |
 | `send_failed` | 500 | SMTP 发送错误（连接、认证或服务器错误）。 |
 
 ## 幂等
 
 - 发送请求支持通过 `Idempotency-Key` 头或 body 字段 `idempotency_key` 实现幂等。
-- 在配置的 TTL（`IDEMPOTENCY_TTL_SECONDS`，默认 300）内，相同 key 的重复请求返回缓存响应（相同 `ok`、`message_id`、`provider`），不再重复发送。
+- 在配置的 TTL（`IDEMPOTENCY_TTL_SECONDS`，默认 300）内，相同 key 的成功请求会返回缓存响应（相同 `ok`、`message_id`、`provider`），不再重复发送。
+- 失败发送不会缓存，因此临时 SMTP 故障可使用同一 key 重试。
 - 缓存为内存；key 在 TTL 后过期。
