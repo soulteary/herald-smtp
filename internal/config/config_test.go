@@ -20,8 +20,11 @@ func TestValid_Logic(t *testing.T) {
 }
 
 func TestSMTPTimeout(t *testing.T) {
+	old := SMTPTimeoutSec
+	t.Cleanup(func() { SMTPTimeoutSec = old })
+	SMTPTimeoutSec = 45
 	got := SMTPTimeout()
-	if got != 30*time.Second {
-		t.Errorf("SMTPTimeout() = %v, want 30s", got)
+	if got != 45*time.Second {
+		t.Errorf("SMTPTimeout() = %v, want 45s", got)
 	}
 }

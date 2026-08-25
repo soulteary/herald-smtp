@@ -123,7 +123,7 @@ The SMTP send failed: connection refused, auth failure, TLS error, or server rej
 
 ### Idempotent hit (cached response)
 
-When Herald (or any client) sends the same `Idempotency-Key` (or body `idempotency_key`) within the configured TTL, herald-smtp returns the cached response without sending again. This is expected.
+When Herald (or any client) repeats a successful request with the same content and `Idempotency-Key` (or body `idempotency_key`) within the configured TTL, herald-smtp returns the cached response without sending again. Failed requests can be retried. Reusing a key for different request content returns `409 idempotency_conflict`.
 
 ### Log level
 

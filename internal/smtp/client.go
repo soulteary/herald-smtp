@@ -17,14 +17,20 @@ func NewClient() (*Client, error) {
 	if !config.Valid() {
 		return nil, nil
 	}
+	if config.UseTLS && config.UseStartTLS {
+		return nil, provider.ErrInvalidConfig("SMTP_USE_TLS and SMTP_USE_STARTTLS cannot both be enabled")
+	}
 	cfg := &provider.SMTPConfig{
-		Host:        config.SMTPHost,
-		Port:        config.SMTPPort,
-		Username:    config.SMTPUser,
-		Password:    config.SMTPPass,
-		From:        config.SMTPFrom,
-		UseStartTLS: config.UseStartTLS,
-		Timeout:     config.SMTPTimeout(),
+		Host:          config.SMTPHost,
+		Port:          config.SMTPPort,
+		Username:      config.SMTPUser,
+		Password:      config.SMTPPass,
+		From:          config.SMTPFrom,
+		FromName:      config.SMTPFromName,
+		UseTLS:        config.UseTLS,
+		UseStartTLS:   config.UseStartTLS,
+		SkipTLSVerify: config.SkipTLSVerify,
+		Timeout:       config.SMTPTimeout(),
 	}
 	p, err := provider.NewSMTPProvider(cfg)
 	if err != nil {
@@ -36,7 +42,9 @@ func NewClient() (*Client, error) {
 // Send sends an email using provider-kit Message; returns provider-kit SendResult and error.
 func (c *Client) Send(ctx context.Context, msg *provider.Message) (*provider.SendResult, error) {
 	if c == nil || c.provider == nil {
-		return nil, nil
+		err := provider.ErrProviderDown("SMTP client is not initialized", nil).
+			WithProvider("smtp", provider.ChannelEmail)
+		return provider.NewFailureResult("smtp", provider.ChannelEmail, err), err
 	}
 	return c.provider.Send(ctx, msg)
 }

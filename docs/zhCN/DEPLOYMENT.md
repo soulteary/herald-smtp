@@ -52,9 +52,15 @@ docker run -d --name herald-smtp -p 8084:8084 \
 | `SMTP_USER` | SMTP 用户名 | `` | 否（若服务器允许匿名） |
 | `SMTP_PASSWORD` | SMTP 密码 | `` | 否 |
 | `SMTP_FROM` | 发件人邮箱地址 | `` | 是（发送时） |
+| `SMTP_FROM_NAME` | 可选的发件人显示名称 | `` | 否 |
+| `SMTP_USE_TLS` | 使用隐式 TLS（通常为 465 端口） | `false` | 否 |
 | `SMTP_USE_STARTTLS` | 使用 STARTTLS | `true` | 否 |
+| `SMTP_SKIP_TLS_VERIFY` | 跳过证书校验，仅限开发环境 | `false` | 否 |
+| `SMTP_TIMEOUT_SECONDS` | SMTP 完整发送过程的超时时间 | `30` | 否 |
 | `LOG_LEVEL` | 日志级别：trace, debug, info, warn, error | `info` | 否 |
 | `IDEMPOTENCY_TTL_SECONDS` | 幂等缓存 TTL（秒） | `300` | 否 |
+
+`SMTP_USE_TLS` 与 `SMTP_USE_STARTTLS` 不能同时启用。使用隐式 TLS 时，应设置 `SMTP_USE_TLS=true` 和 `SMTP_USE_STARTTLS=false`。
 
 当 `SMTP_HOST` 或 `SMTP_FROM` 缺失时，`POST /v1/send` 返回 `503`，`error_code` 为 `"provider_down"`。
 

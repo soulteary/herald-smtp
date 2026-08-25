@@ -11,6 +11,7 @@ This document describes security considerations and recommendations for herald-s
 ## SMTP Credentials
 
 - **SMTP_HOST**, **SMTP_USER**, **SMTP_PASSWORD**, and **SMTP_FROM** must never be hardcoded or committed to the repository.
+- Keep `SMTP_SKIP_TLS_VERIFY=false` in production. Disabling certificate verification permits machine-in-the-middle attacks against the SMTP connection.
 - Store them in environment variables or a secret manager (e.g. Kubernetes Secrets, HashiCorp Vault). Use `.env` only for local development and ensure `.env` is in `.gitignore`.
 - Rotate SMTP passwords periodically and update herald-smtp configuration accordingly.
 
