@@ -82,8 +82,14 @@ services:
 | `SMTP_TIMEOUT_SECONDS` | End-to-end SMTP send timeout | `30` | No |
 | `LOG_LEVEL` | Log level: trace, debug, info, warn, error | `info` | No |
 | `IDEMPOTENCY_TTL_SECONDS` | Idempotency cache TTL in seconds | `300` | No |
+| `IDEMPOTENCY_MAX_ENTRIES` | Maximum in-flight and cached idempotency keys | `10000` | No |
+| `HTTP_BODY_LIMIT_BYTES` | Maximum HTTP request body size | `65536` | No |
+| `HTTP_READ_TIMEOUT_SECONDS` | HTTP request read timeout | `10` | No |
+| `HTTP_WRITE_TIMEOUT_SECONDS` | HTTP response write timeout | `40` | No |
+| `HTTP_IDLE_TIMEOUT_SECONDS` | HTTP keep-alive idle timeout | `60` | No |
 
 `SMTP_USE_TLS` and `SMTP_USE_STARTTLS` are mutually exclusive. For implicit TLS, set `SMTP_USE_TLS=true` and `SMTP_USE_STARTTLS=false`.
+The effective HTTP write timeout is always at least `SMTP_TIMEOUT_SECONDS + 5` seconds so an SMTP operation can finish before the response deadline.
 
 When `SMTP_HOST` or `SMTP_FROM` is missing, `POST /v1/send` returns `503` with `error_code: "provider_down"`.
 

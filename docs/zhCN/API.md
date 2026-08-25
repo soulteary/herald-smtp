@@ -86,10 +86,12 @@ http://localhost:8084
 | `invalid_destination` | 400 | `to` 缺失或为空。 |
 | `validation_failed` | 400 | 收件地址或邮件头校验失败。 |
 | `idempotency_conflict` | 409 | 幂等键与已有请求冲突。 |
-| `rate_limited` | 429 | 上游服务触发限流。 |
+| `rate_limited` | 429 | 上游服务触发限流，或幂等存储达到容量上限。 |
 | `provider_down` | 503 | 未配置 SMTP（SMTP_HOST / SMTP_FROM 未设置）。 |
 | `timeout` | 504 | SMTP 发送超过截止时间。 |
 | `send_failed` | 500 | SMTP 发送错误（连接、认证或服务器错误）。 |
+
+超过 `HTTP_BODY_LIMIT_BYTES` 的请求体会在 JSON 解析前由 HTTP 服务器以 `413` 状态拒绝。
 
 ## 幂等
 
@@ -98,3 +100,4 @@ http://localhost:8084
 - 使用相同 key 和内容的并发请求只触发一次 SMTP 发送，其余请求等待并复用首个成功结果。
 - 失败发送不会缓存，因此临时 SMTP 故障可使用同一 key 重试。
 - 缓存为内存；key 在 TTL 后过期。
+- 存储容量由 `IDEMPOTENCY_MAX_ENTRIES` 限制（默认 10000）。全部槽位占用时，新 key 返回 `429 rate_limited`，已有 key 仍可继续使用。

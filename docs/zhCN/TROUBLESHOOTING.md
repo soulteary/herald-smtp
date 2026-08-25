@@ -133,3 +133,5 @@ SMTP 发送失败：连接被拒、认证失败、TLS 错误或服务器拒绝�
 ### TTL
 
 幂等缓存 TTL 由 `IDEMPOTENCY_TTL_SECONDS`（默认 300）控制。超过 TTL 后，相同 key 会被视为新请求并可能触发新的发送。
+
+如果新 key 返回 `429 rate_limited`，表示内存存储已达到 `IDEMPOTENCY_MAX_ENTRIES`（默认 10000）。已有 key 仍可使用；可减少唯一 key 的产生速度、等待条目过期，或在服务内存预算内提高上限。

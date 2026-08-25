@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -31,9 +32,12 @@ func (m *mockSender) Send(ctx context.Context, msg *provider.Message) (*provider
 }
 
 func testApp(mock smtpSender) *fiber.App {
+	return testAppWithStore(mock, idempotency.NewStore(300, 10000))
+}
+
+func testAppWithStore(mock smtpSender, idemStore *idempotency.Store) *fiber.App {
 	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 	log := logger.New(logger.Config{Level: logger.InfoLevel, ServiceName: "test"})
-	idemStore := idempotency.NewStore(300)
 	app.Post("/v1/send", func(c *fiber.Ctx) error {
 		return SendHandler(c, mock, idemStore, log)
 	})
@@ -74,6 +78,63 @@ func TestSendHandler_InvalidRequest_BadBody(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestSendHandler_RejectsOversizedBody(t *testing.T) {
+	old := config.HTTPBodyLimitBytes
+	t.Cleanup(func() { config.HTTPBodyLimitBytes = old })
+	config.HTTPBodyLimitBytes = 128
+
+	mock := &mockSender{}
+	app := testApp(mock)
+	body, _ := json.Marshal(provider.HTTPSendRequest{
+		To:   "u@example.com",
+		Body: strings.Repeat("x", 256),
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want 413", resp.StatusCode)
+	}
+	var out provider.HTTPSendResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.ErrorCode != "invalid_request" {
+		t.Fatalf("error_code = %q, want invalid_request", out.ErrorCode)
+	}
+}
+
+func TestSendHandler_MapsIdempotencyCapacityToRateLimit(t *testing.T) {
+	store := idempotency.NewStore(300, 1)
+	if _, decision, err := store.Begin(context.Background(), "occupied", "request"); err != nil || decision != idempotency.Proceed {
+		t.Fatalf("occupy store: decision = %v, error = %v", decision, err)
+	}
+	t.Cleanup(func() { store.Finish("occupied", "request", false, "") })
+
+	mock := &mockSender{}
+	app := testAppWithStore(mock, store)
+	body, _ := json.Marshal(provider.HTTPSendRequest{To: "u@example.com", IdempotencyKey: "new-key"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429", resp.StatusCode)
+	}
+	var out provider.HTTPSendResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.ErrorCode != string(provider.ReasonRateLimited) {
+		t.Fatalf("error_code = %q, want %q", out.ErrorCode, provider.ReasonRateLimited)
 	}
 }
 
@@ -141,8 +202,29 @@ func TestSendHandler_SendError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("status = %d, want 500", resp.StatusCode)
+	if resp.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("status = %d, want 504", resp.StatusCode)
+	}
+}
+
+func TestSendHandler_HidesUnexpectedInternalError(t *testing.T) {
+	mock := &mockSender{sendFunc: func(context.Context, *provider.Message) (*provider.SendResult, error) {
+		return nil, errors.New("dial tcp 10.0.0.7:25: internal detail")
+	}}
+	app := testApp(mock)
+	body, _ := json.Marshal(provider.HTTPSendRequest{To: "u@example.com"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out provider.HTTPSendResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.ErrorMessage != "failed to send email" {
+		t.Fatalf("error_message = %q, want generic message", out.ErrorMessage)
 	}
 }
 
@@ -164,15 +246,15 @@ func TestSendHandler_SendErrorWithIdempotencyKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("status = %d, want 500", resp.StatusCode)
+	if resp.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("status = %d, want 504", resp.StatusCode)
 	}
 	// Transient failures are not cached, so the same key can be retried.
 	req2 := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
 	resp2, _ := app.Test(req2, -1)
-	if resp2.StatusCode != http.StatusInternalServerError {
-		t.Errorf("retry response status = %d, want 500", resp2.StatusCode)
+	if resp2.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("retry response status = %d, want 504", resp2.StatusCode)
 	}
 	if calls != 2 {
 		t.Errorf("Send() calls = %d, want 2 retries", calls)

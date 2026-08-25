@@ -2,9 +2,13 @@ package idempotency
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 )
+
+// ErrCapacityExceeded is returned when a new key would exceed the store limit.
+var ErrCapacityExceeded = errors.New("idempotency store capacity exceeded")
 
 type entry struct {
 	fingerprint string
@@ -21,15 +25,19 @@ type Store struct {
 	mu              sync.Mutex
 	m               map[string]entry
 	ttlSec          int
+	maxEntries      int
 	cleanupInterval time.Duration
 	nextCleanup     time.Time
 }
 
-// NewStore creates a store with the given TTL in seconds.
-func NewStore(ttlSec int) *Store {
-	s := &Store{m: make(map[string]entry), ttlSec: ttlSec}
+// NewStore creates a store with the given TTL in seconds and entry limit.
+func NewStore(ttlSec, maxEntries int) *Store {
+	s := &Store{m: make(map[string]entry), ttlSec: ttlSec, maxEntries: maxEntries}
 	if s.ttlSec <= 0 {
 		s.ttlSec = 300
+	}
+	if s.maxEntries <= 0 {
+		s.maxEntries = 10000
 	}
 	s.cleanupInterval = time.Duration(s.ttlSec) * time.Second
 	if s.cleanupInterval > time.Minute {
@@ -66,6 +74,13 @@ func (s *Store) Begin(ctx context.Context, key, fingerprint string) (cached, Dec
 		s.cleanupExpired(now)
 		e, ok := s.m[key]
 		if !ok {
+			if len(s.m) >= s.maxEntries {
+				s.removeExpired(now)
+			}
+			if len(s.m) >= s.maxEntries {
+				s.mu.Unlock()
+				return cached{}, Proceed, ErrCapacityExceeded
+			}
 			s.m[key] = entry{fingerprint: fingerprint, ready: make(chan struct{})}
 			s.mu.Unlock()
 			return cached{}, Proceed, nil
@@ -122,10 +137,14 @@ func (s *Store) cleanupExpired(now time.Time) {
 	if now.Before(s.nextCleanup) {
 		return
 	}
+	s.removeExpired(now)
+	s.nextCleanup = now.Add(s.cleanupInterval)
+}
+
+func (s *Store) removeExpired(now time.Time) {
 	for storedKey, storedEntry := range s.m {
 		if storedEntry.complete && now.After(storedEntry.expiresAt) {
 			delete(s.m, storedKey)
 		}
 	}
-	s.nextCleanup = now.Add(s.cleanupInterval)
 }

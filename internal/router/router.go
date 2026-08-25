@@ -25,7 +25,7 @@ func Setup(app *fiber.App, log *logger.Logger) {
 
 // setupWith mounts routes; if inject is non-nil it is used as the send client (for tests).
 func setupWith(app *fiber.App, log *logger.Logger, inject sendClient) {
-	idemStore := idempotency.NewStore(config.IdemTTLSec)
+	idemStore := idempotency.NewStore(config.IdemTTLSec, config.IdempotencyMaxEntries())
 	var smtpClient sendClient
 	if inject != nil {
 		smtpClient = inject
