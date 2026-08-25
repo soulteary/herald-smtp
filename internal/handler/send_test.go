@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/soulteary/herald-smtp/internal/config"
 	"github.com/soulteary/herald-smtp/internal/idempotency"
-	"github.com/soulteary/logger-kit"
+	"github.com/soulteary/logger-kit/v2"
 	"github.com/soulteary/provider-kit"
 )
 
@@ -36,9 +36,9 @@ func testApp(mock smtpSender) *fiber.App {
 }
 
 func testAppWithStore(mock smtpSender, idemStore *idempotency.Store) *fiber.App {
-	app := fiber.New(fiber.Config{DisableStartupMessage: true})
+	app := fiber.New()
 	log := logger.New(logger.Config{Level: logger.InfoLevel, ServiceName: "test"})
-	app.Post("/v1/send", func(c *fiber.Ctx) error {
+	app.Post("/v1/send", func(c fiber.Ctx) error {
 		return SendHandler(c, mock, idemStore, log)
 	})
 	return app
@@ -56,7 +56,7 @@ func TestSendHandler_Unauthorized(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestSendHandler_InvalidRequest_BadBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader([]byte("not json")))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestSendHandler_RejectsOversizedBody(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestSendHandler_MapsIdempotencyCapacityToRateLimit(t *testing.T) {
 	body, _ := json.Marshal(provider.HTTPSendRequest{To: "u@example.com", IdempotencyKey: "new-key"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestSendHandler_InvalidDestination(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestSendHandler_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestSendHandler_SendError(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestSendHandler_HidesUnexpectedInternalError(t *testing.T) {
 	body, _ := json.Marshal(provider.HTTPSendRequest{To: "u@example.com"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func TestSendHandler_SendErrorWithIdempotencyKey(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestSendHandler_SendErrorWithIdempotencyKey(t *testing.T) {
 	// Transient failures are not cached, so the same key can be retried.
 	req2 := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
-	resp2, _ := app.Test(req2, -1)
+	resp2, _ := app.Test(req2, fiber.TestConfig{Timeout: 0})
 	if resp2.StatusCode != http.StatusGatewayTimeout {
 		t.Errorf("retry response status = %d, want 504", resp2.StatusCode)
 	}
@@ -287,7 +287,7 @@ func TestSendHandler_MapsProviderErrors(t *testing.T) {
 			body, _ := json.Marshal(provider.HTTPSendRequest{To: "u@example.com"})
 			req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
-			resp, err := app.Test(req, -1)
+			resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -317,7 +317,7 @@ func TestSendHandler_ResultNotOK(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ func TestSendHandler_IdempotentHit(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp1, _ := app.Test(req, -1)
+	resp1, _ := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if resp1.StatusCode != http.StatusOK {
 		t.Fatalf("first request status = %d", resp1.StatusCode)
 	}
@@ -348,7 +348,7 @@ func TestSendHandler_IdempotentHit(t *testing.T) {
 	// Second request with same key should return cached (mock should not be called again if we had call count; we just check 200 and same body)
 	req2 := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
-	resp2, _ := app.Test(req2, -1)
+	resp2, _ := app.Test(req2, fiber.TestConfig{Timeout: 0})
 	if resp2.StatusCode != http.StatusOK {
 		t.Errorf("idempotent second request status = %d", resp2.StatusCode)
 	}
@@ -372,7 +372,7 @@ func TestSendHandler_ResultNil(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,7 +395,7 @@ func TestSendHandler_IdempotencyKeyFromHeader(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "header-key")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +406,7 @@ func TestSendHandler_IdempotencyKeyFromHeader(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
 	req2.Header.Set("Idempotency-Key", "header-key")
-	resp2, _ := app.Test(req2, -1)
+	resp2, _ := app.Test(req2, fiber.TestConfig{Timeout: 0})
 	if resp2.StatusCode != http.StatusOK {
 		t.Errorf("second request status = %d", resp2.StatusCode)
 	}
@@ -425,7 +425,7 @@ func TestSendHandler_RejectsConflictingIdempotencyKeys(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "header-key")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +443,7 @@ func TestSendHandler_RejectsOversizedIdempotencyKey(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -463,7 +463,7 @@ func TestSendHandler_IdempotencyKeyContentConflict(t *testing.T) {
 	firstBody, _ := json.Marshal(provider.HTTPSendRequest{To: "first@example.com", IdempotencyKey: "same-key"})
 	first := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(firstBody))
 	first.Header.Set("Content-Type", "application/json")
-	firstResp, err := app.Test(first, -1)
+	firstResp, err := app.Test(first, fiber.TestConfig{Timeout: 0})
 	if err != nil || firstResp.StatusCode != http.StatusOK {
 		t.Fatalf("first request status = %d, error = %v", firstResp.StatusCode, err)
 	}
@@ -471,7 +471,7 @@ func TestSendHandler_IdempotencyKeyContentConflict(t *testing.T) {
 	secondBody, _ := json.Marshal(provider.HTTPSendRequest{To: "second@example.com", IdempotencyKey: "same-key"})
 	second := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(secondBody))
 	second.Header.Set("Content-Type", "application/json")
-	secondResp, err := app.Test(second, -1)
+	secondResp, err := app.Test(second, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -506,7 +506,7 @@ func TestSendHandler_ConcurrentIdempotentRequestsSendOnce(t *testing.T) {
 	send := func(result chan<- *http.Response) {
 		req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
+		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 		if err != nil {
 			result <- nil
 			return
@@ -577,7 +577,7 @@ func TestSendHandler_DefaultSubjectAndBodyFromParams(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -616,7 +616,7 @@ func TestSendHandler_DefaultBodyWhenNoCode(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}

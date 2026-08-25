@@ -10,10 +10,10 @@ import (
 	"net/mail"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/soulteary/herald-smtp/internal/config"
 	"github.com/soulteary/herald-smtp/internal/idempotency"
-	"github.com/soulteary/logger-kit"
+	"github.com/soulteary/logger-kit/v2"
 	"github.com/soulteary/provider-kit"
 )
 
@@ -25,7 +25,7 @@ type smtpSender interface {
 const maxIdempotencyKeyBytes = 256
 
 // SendHandler handles POST /v1/send from Herald.
-func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Store, log *logger.Logger) error {
+func SendHandler(c fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Store, log *logger.Logger) error {
 	if !authorized(c) {
 		log.Warn().Str("client_ip", c.IP()).Msg("send unauthorized: invalid or missing API key")
 		return c.Status(fiber.StatusUnauthorized).JSON(provider.HTTPSendResponse{
@@ -108,7 +108,7 @@ func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Sto
 }
 
 // authorized reports whether the request carries a valid API key (or auth is disabled).
-func authorized(c *fiber.Ctx) bool {
+func authorized(c fiber.Ctx) bool {
 	if config.APIKey == "" {
 		return true
 	}
@@ -118,9 +118,9 @@ func authorized(c *fiber.Ctx) bool {
 }
 
 // parseRequest parses the send request body and resolves the idempotency key from the header.
-func parseRequest(c *fiber.Ctx) (provider.HTTPSendRequest, error) {
+func parseRequest(c fiber.Ctx) (provider.HTTPSendRequest, error) {
 	var req provider.HTTPSendRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return req, err
 	}
 	headerKey := c.Get("Idempotency-Key")
@@ -184,7 +184,7 @@ func buildMessage(req provider.HTTPSendRequest) *provider.Message {
 // sendFailure preserves provider-kit error reasons in the HTTP response and
 // maps them to retry-friendly status codes. Failed sends are deliberately not
 // cached so callers can retry transient SMTP failures with the same key.
-func sendFailure(c *fiber.Ctx, result *provider.SendResult, sendErr error) error {
+func sendFailure(c fiber.Ctx, result *provider.SendResult, sendErr error) error {
 	reason := provider.ReasonSendFailed
 	message := ""
 	if result != nil && result.Error != nil {
