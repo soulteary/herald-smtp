@@ -28,3 +28,86 @@ func TestSMTPTimeout(t *testing.T) {
 		t.Errorf("SMTPTimeout() = %v, want 45s", got)
 	}
 }
+
+func TestRuntimeLimits(t *testing.T) {
+	oldSMTPTimeout := SMTPTimeoutSec
+	oldMaxEntries := IdemMaxEntries
+	oldBodyLimit := HTTPBodyLimitBytes
+	oldReadTimeout := HTTPReadTimeoutSec
+	oldWriteTimeout := HTTPWriteTimeoutSec
+	oldIdleTimeout := HTTPIdleTimeoutSec
+	t.Cleanup(func() {
+		SMTPTimeoutSec = oldSMTPTimeout
+		IdemMaxEntries = oldMaxEntries
+		HTTPBodyLimitBytes = oldBodyLimit
+		HTTPReadTimeoutSec = oldReadTimeout
+		HTTPWriteTimeoutSec = oldWriteTimeout
+		HTTPIdleTimeoutSec = oldIdleTimeout
+	})
+
+	SMTPTimeoutSec = 30
+	IdemMaxEntries = 123
+	HTTPBodyLimitBytes = 4096
+	HTTPReadTimeoutSec = 7
+	HTTPWriteTimeoutSec = 50
+	HTTPIdleTimeoutSec = 70
+
+	if got := IdempotencyMaxEntries(); got != 123 {
+		t.Errorf("IdempotencyMaxEntries() = %d, want 123", got)
+	}
+	if got := HTTPBodyLimit(); got != 4096 {
+		t.Errorf("HTTPBodyLimit() = %d, want 4096", got)
+	}
+	if got := HTTPReadTimeout(); got != 7*time.Second {
+		t.Errorf("HTTPReadTimeout() = %v, want 7s", got)
+	}
+	if got := HTTPWriteTimeout(); got != 50*time.Second {
+		t.Errorf("HTTPWriteTimeout() = %v, want 50s", got)
+	}
+	if got := HTTPIdleTimeout(); got != 70*time.Second {
+		t.Errorf("HTTPIdleTimeout() = %v, want 70s", got)
+	}
+}
+
+func TestRuntimeLimitsUseSafeFallbacks(t *testing.T) {
+	oldSMTPTimeout := SMTPTimeoutSec
+	oldMaxEntries := IdemMaxEntries
+	oldBodyLimit := HTTPBodyLimitBytes
+	oldReadTimeout := HTTPReadTimeoutSec
+	oldWriteTimeout := HTTPWriteTimeoutSec
+	oldIdleTimeout := HTTPIdleTimeoutSec
+	t.Cleanup(func() {
+		SMTPTimeoutSec = oldSMTPTimeout
+		IdemMaxEntries = oldMaxEntries
+		HTTPBodyLimitBytes = oldBodyLimit
+		HTTPReadTimeoutSec = oldReadTimeout
+		HTTPWriteTimeoutSec = oldWriteTimeout
+		HTTPIdleTimeoutSec = oldIdleTimeout
+	})
+
+	SMTPTimeoutSec = 0
+	IdemMaxEntries = 0
+	HTTPBodyLimitBytes = -1
+	HTTPReadTimeoutSec = 0
+	HTTPWriteTimeoutSec = 1
+	HTTPIdleTimeoutSec = 0
+
+	if got := SMTPTimeout(); got != 30*time.Second {
+		t.Errorf("SMTPTimeout() = %v, want default 30s", got)
+	}
+	if got := IdempotencyMaxEntries(); got != 10000 {
+		t.Errorf("IdempotencyMaxEntries() = %d, want default 10000", got)
+	}
+	if got := HTTPBodyLimit(); got != 64*1024 {
+		t.Errorf("HTTPBodyLimit() = %d, want default 65536", got)
+	}
+	if got := HTTPReadTimeout(); got != 10*time.Second {
+		t.Errorf("HTTPReadTimeout() = %v, want default 10s", got)
+	}
+	if got := HTTPWriteTimeout(); got != 35*time.Second {
+		t.Errorf("HTTPWriteTimeout() = %v, want SMTP timeout plus 5s", got)
+	}
+	if got := HTTPIdleTimeout(); got != 60*time.Second {
+		t.Errorf("HTTPIdleTimeout() = %v, want default 60s", got)
+	}
+}

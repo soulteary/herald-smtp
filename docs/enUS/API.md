@@ -86,10 +86,12 @@ Send an email via SMTP. Called by Herald when channel is `email` and `HERALD_SMT
 | `invalid_destination` | 400 | `to` is missing or empty. |
 | `validation_failed` | 400 | Recipient or header validation failed. |
 | `idempotency_conflict` | 409 | An idempotency key conflicts with an existing request. |
-| `rate_limited` | 429 | The provider rate limited the send. |
+| `rate_limited` | 429 | The provider rate limited the send or the idempotency store reached capacity. |
 | `provider_down` | 503 | SMTP not configured (SMTP_HOST / SMTP_FROM not set). |
 | `timeout` | 504 | The SMTP send exceeded its deadline. |
 | `send_failed` | 500 | SMTP send error (e.g. connection, auth, or server error). |
+
+Request bodies larger than `HTTP_BODY_LIMIT_BYTES` are rejected by the HTTP server with status `413` before JSON parsing.
 
 ## Idempotency
 
@@ -98,3 +100,4 @@ Send an email via SMTP. Called by Herald when channel is `email` and `HERALD_SMT
 - Concurrent requests with the same key and content share one SMTP send; followers wait for and reuse the first successful result.
 - Failed sends are not cached, allowing transient SMTP failures to be retried with the same key.
 - Cache is in-memory; key expires after TTL.
+- The store is bounded by `IDEMPOTENCY_MAX_ENTRIES` (default 10000). A new unique key returns `429 rate_limited` when all slots are occupied; existing keys continue to work.

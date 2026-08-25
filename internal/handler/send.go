@@ -32,6 +32,11 @@ func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Sto
 			OK: false, ErrorCode: "unauthorized", ErrorMessage: "invalid or missing API key",
 		})
 	}
+	if len(c.Body()) > config.HTTPBodyLimit() {
+		return c.Status(fiber.StatusRequestEntityTooLarge).JSON(provider.HTTPSendResponse{
+			OK: false, ErrorCode: "invalid_request", ErrorMessage: "request body exceeds configured limit",
+		})
+	}
 
 	req, err := parseRequest(c)
 	if err != nil {
@@ -53,7 +58,15 @@ func SendHandler(c *fiber.Ctx, smtpClient smtpSender, idemStore *idempotency.Sto
 		fingerprint = requestFingerprint(req)
 		cached, decision, beginErr := idemStore.Begin(c.Context(), req.IdempotencyKey, fingerprint)
 		if beginErr != nil {
-			providerErr := provider.ErrSendFailed("idempotent request wait canceled", beginErr)
+			var providerErr *provider.ProviderError
+			switch {
+			case errors.Is(beginErr, idempotency.ErrCapacityExceeded):
+				providerErr = provider.ErrRateLimited("too many active idempotency keys")
+			case errors.Is(beginErr, context.DeadlineExceeded):
+				providerErr = provider.ErrTimeout("idempotent request wait timed out", beginErr)
+			default:
+				providerErr = provider.ErrSendFailed("idempotent request wait canceled", beginErr)
+			}
 			return sendFailure(c, nil, providerErr)
 		}
 		switch decision {
@@ -182,8 +195,13 @@ func sendFailure(c *fiber.Ctx, result *provider.SendResult, sendErr error) error
 		if errors.As(sendErr, &providerErr) {
 			reason = providerErr.Reason
 			message = providerErr.Message
+		} else if errors.Is(sendErr, context.DeadlineExceeded) {
+			reason = provider.ReasonTimeout
+			message = "send timed out"
+		} else if errors.Is(sendErr, context.Canceled) {
+			message = "send canceled"
 		} else if sendErr != nil {
-			message = sendErr.Error()
+			message = "failed to send email"
 		}
 	}
 	return c.Status(statusForReason(reason)).JSON(provider.HTTPSendResponse{

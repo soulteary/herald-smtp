@@ -9,14 +9,14 @@ import (
 
 func TestNewStore(t *testing.T) {
 	for _, ttl := range []int{60, 0} {
-		if store := NewStore(ttl); store == nil {
+		if store := NewStore(ttl, 0); store == nil {
 			t.Fatalf("NewStore(%d) returned nil", ttl)
 		}
 	}
 }
 
 func TestStore_BeginFinishAndHit(t *testing.T) {
-	store := NewStore(300)
+	store := NewStore(300, 10000)
 	value, decision, err := store.Begin(context.Background(), "key", "request-1")
 	if err != nil || decision != Proceed {
 		t.Fatalf("Begin() = (%#v, %v, %v), want Proceed", value, decision, err)
@@ -33,7 +33,7 @@ func TestStore_BeginFinishAndHit(t *testing.T) {
 }
 
 func TestStore_FailedReservationCanRetry(t *testing.T) {
-	store := NewStore(300)
+	store := NewStore(300, 10000)
 	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
 		t.Fatalf("first Begin() decision = %v, error = %v", decision, err)
 	}
@@ -44,8 +44,52 @@ func TestStore_FailedReservationCanRetry(t *testing.T) {
 	store.Finish("key", "request-1", false, "")
 }
 
+func TestStore_CapacityBoundsNewKeys(t *testing.T) {
+	store := NewStore(300, 1)
+	if _, decision, err := store.Begin(context.Background(), "first", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("first Begin() = (%v, %v), want Proceed", decision, err)
+	}
+	if _, decision, err := store.Begin(context.Background(), "second", "request-2"); !errors.Is(err, ErrCapacityExceeded) || decision != Proceed {
+		t.Fatalf("second Begin() = (%v, %v), want capacity error", decision, err)
+	}
+	store.Finish("first", "request-1", true, "msg-1")
+	value, decision, err := store.Begin(context.Background(), "first", "request-1")
+	if err != nil || decision != Hit || value.MessageID != "msg-1" {
+		t.Fatalf("existing key at capacity = (%#v, %v, %v), want hit", value, decision, err)
+	}
+}
+
+func TestStore_FailedReservationFreesCapacity(t *testing.T) {
+	store := NewStore(300, 1)
+	if _, decision, err := store.Begin(context.Background(), "first", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("first Begin() = (%v, %v), want Proceed", decision, err)
+	}
+	store.Finish("first", "request-1", false, "")
+	if _, decision, err := store.Begin(context.Background(), "second", "request-2"); err != nil || decision != Proceed {
+		t.Fatalf("second Begin() = (%v, %v), want Proceed after release", decision, err)
+	}
+	store.Finish("second", "request-2", false, "")
+}
+
+func TestStore_ExpiredResultFreesCapacityImmediately(t *testing.T) {
+	store := NewStore(300, 1)
+	if _, decision, err := store.Begin(context.Background(), "first", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("first Begin() = (%v, %v), want Proceed", decision, err)
+	}
+	store.Finish("first", "request-1", true, "msg-1")
+	entry := store.m["first"]
+	entry.expiresAt = time.Now().Add(-time.Second)
+	store.m["first"] = entry
+	store.nextCleanup = time.Now().Add(time.Minute)
+
+	if _, decision, err := store.Begin(context.Background(), "second", "request-2"); err != nil || decision != Proceed {
+		t.Fatalf("second Begin() = (%v, %v), want Proceed after expired entry cleanup", decision, err)
+	}
+	store.Finish("second", "request-2", false, "")
+}
+
 func TestStore_Conflict(t *testing.T) {
-	store := NewStore(300)
+	store := NewStore(300, 10000)
 	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
 		t.Fatalf("first Begin() decision = %v, error = %v", decision, err)
 	}
@@ -56,7 +100,7 @@ func TestStore_Conflict(t *testing.T) {
 }
 
 func TestStore_ConcurrentDuplicateWaitsForOwner(t *testing.T) {
-	store := NewStore(300)
+	store := NewStore(300, 10000)
 	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
 		t.Fatalf("owner Begin() decision = %v, error = %v", decision, err)
 	}
@@ -89,7 +133,7 @@ func TestStore_ConcurrentDuplicateWaitsForOwner(t *testing.T) {
 }
 
 func TestStore_WaitHonorsContextCancellation(t *testing.T) {
-	store := NewStore(300)
+	store := NewStore(300, 10000)
 	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
 		t.Fatalf("owner Begin() decision = %v, error = %v", decision, err)
 	}
@@ -102,7 +146,7 @@ func TestStore_WaitHonorsContextCancellation(t *testing.T) {
 }
 
 func TestStore_ExpiredEntryCanBeReused(t *testing.T) {
-	store := NewStore(300)
+	store := NewStore(300, 10000)
 	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
 		t.Fatalf("Begin() decision = %v, error = %v", decision, err)
 	}
@@ -118,7 +162,7 @@ func TestStore_ExpiredEntryCanBeReused(t *testing.T) {
 }
 
 func TestStore_BeginCleansExpiredEntries(t *testing.T) {
-	store := NewStore(300)
+	store := NewStore(300, 10000)
 	store.m["expired"] = entry{complete: true, expiresAt: time.Now().Add(-time.Second)}
 	store.nextCleanup = time.Time{}
 	if _, decision, err := store.Begin(context.Background(), "new", "request"); err != nil || decision != Proceed {
@@ -131,7 +175,7 @@ func TestStore_BeginCleansExpiredEntries(t *testing.T) {
 }
 
 func TestStore_FinishIgnoresUnknownOrMismatchedReservation(t *testing.T) {
-	store := NewStore(300)
+	store := NewStore(300, 10000)
 	store.Finish("missing", "request", true, "msg")
 	if _, decision, err := store.Begin(context.Background(), "key", "request-1"); err != nil || decision != Proceed {
 		t.Fatalf("Begin() decision = %v, error = %v", decision, err)

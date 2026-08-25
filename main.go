@@ -46,7 +46,7 @@ func main() {
 	if !config.Valid() {
 		log.Warn().Msg("SMTP not configured; /v1/send will return 503")
 	}
-	app := fiber.New(fiber.Config{DisableStartupMessage: false})
+	app := newApp()
 	router.Setup(app, log)
 
 	go func() {
@@ -64,4 +64,14 @@ func main() {
 	if err := app.ShutdownWithContext(ctx); err != nil {
 		log.Warn().Err(err).Msg("shutdown error")
 	}
+}
+
+func newApp() *fiber.App {
+	return fiber.New(fiber.Config{
+		DisableStartupMessage: false,
+		BodyLimit:             config.HTTPBodyLimit(),
+		ReadTimeout:           config.HTTPReadTimeout(),
+		WriteTimeout:          config.HTTPWriteTimeout(),
+		IdleTimeout:           config.HTTPIdleTimeout(),
+	})
 }

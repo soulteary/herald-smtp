@@ -133,3 +133,5 @@ The SMTP send failed: connection refused, auth failure, TLS error, or server rej
 ### TTL
 
 Idempotency cache TTL is controlled by `IDEMPOTENCY_TTL_SECONDS` (default 300). After TTL, the same key is treated as a new request and may trigger a new send.
+
+If a new key returns `429 rate_limited`, the in-memory store has reached `IDEMPOTENCY_MAX_ENTRIES` (default 10000). Existing keys remain available. Reduce unique-key churn, wait for entries to expire, or raise the limit within the service's memory budget.

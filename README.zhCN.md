@@ -66,8 +66,14 @@ sequenceDiagram
 | `SMTP_TIMEOUT_SECONDS` | SMTP 完整发送过程的超时时间 | `30` | 否 |
 | `LOG_LEVEL` | 日志级别：trace, debug, info, warn, error | `info` | 否 |
 | `IDEMPOTENCY_TTL_SECONDS` | 幂等缓存 TTL（秒） | `300` | 否 |
+| `IDEMPOTENCY_MAX_ENTRIES` | 处理中及已缓存幂等键的最大总数 | `10000` | 否 |
+| `HTTP_BODY_LIMIT_BYTES` | HTTP 请求体大小上限 | `65536` | 否 |
+| `HTTP_READ_TIMEOUT_SECONDS` | HTTP 请求读取超时 | `10` | 否 |
+| `HTTP_WRITE_TIMEOUT_SECONDS` | HTTP 响应写入超时 | `40` | 否 |
+| `HTTP_IDLE_TIMEOUT_SECONDS` | HTTP 长连接空闲超时 | `60` | 否 |
 
 `SMTP_USE_TLS` 与 `SMTP_USE_STARTTLS` 不能同时启用。使用隐式 TLS 时，应设置 `SMTP_USE_TLS=true` 和 `SMTP_USE_STARTTLS=false`。
+实际 HTTP 写入超时始终不低于 `SMTP_TIMEOUT_SECONDS + 5` 秒。
 
 ## Herald 侧配置
 
