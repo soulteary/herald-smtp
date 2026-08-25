@@ -3,13 +3,13 @@ package router
 import (
 	"context"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/soulteary/health-kit"
+	"github.com/gofiber/fiber/v3"
+	"github.com/soulteary/health-kit/v2"
 	"github.com/soulteary/herald-smtp/internal/config"
 	"github.com/soulteary/herald-smtp/internal/handler"
 	"github.com/soulteary/herald-smtp/internal/idempotency"
 	"github.com/soulteary/herald-smtp/internal/smtp"
-	"github.com/soulteary/logger-kit"
+	"github.com/soulteary/logger-kit/v2"
 	"github.com/soulteary/provider-kit"
 )
 
@@ -38,7 +38,7 @@ func setupWith(app *fiber.App, log *logger.Logger, inject sendClient) {
 		}
 	}
 	v1 := app.Group("/v1")
-	v1.Post("/send", func(c *fiber.Ctx) error {
+	v1.Post("/send", func(c fiber.Ctx) error {
 		if smtpClient == nil {
 			log.Warn().Msg("send 503: SMTP not configured")
 			return c.Status(fiber.StatusServiceUnavailable).JSON(provider.HTTPSendResponse{

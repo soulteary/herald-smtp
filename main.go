@@ -8,13 +8,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 	"github.com/soulteary/herald-smtp/internal/config"
 	"github.com/soulteary/herald-smtp/internal/router"
-	"github.com/soulteary/logger-kit"
-	version "github.com/soulteary/version-kit"
+	"github.com/soulteary/logger-kit/v2"
+	version "github.com/soulteary/version-kit/v2"
 )
 
 // showBanner displays the startup banner with version
@@ -68,10 +68,9 @@ func main() {
 
 func newApp() *fiber.App {
 	return fiber.New(fiber.Config{
-		DisableStartupMessage: false,
-		BodyLimit:             config.HTTPBodyLimit(),
-		ReadTimeout:           config.HTTPReadTimeout(),
-		WriteTimeout:          config.HTTPWriteTimeout(),
-		IdleTimeout:           config.HTTPIdleTimeout(),
+		BodyLimit:    config.HTTPBodyLimit(),
+		ReadTimeout:  config.HTTPReadTimeout(),
+		WriteTimeout: config.HTTPWriteTimeout(),
+		IdleTimeout:  config.HTTPIdleTimeout(),
 	})
 }

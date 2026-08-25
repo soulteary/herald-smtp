@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/soulteary/herald-smtp/internal/config"
-	"github.com/soulteary/logger-kit"
+	"github.com/soulteary/logger-kit/v2"
 	"github.com/soulteary/provider-kit"
 )
 
@@ -27,12 +27,12 @@ func (m *mockSendClient) Send(ctx context.Context, msg *provider.Message) (*prov
 }
 
 func TestRouter_Healthz(t *testing.T) {
-	app := fiber.New(fiber.Config{DisableStartupMessage: true})
+	app := fiber.New()
 	log := logger.New(logger.Config{Level: logger.InfoLevel, ServiceName: "test"})
 	Setup(app, log)
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestRouter_Send_503WhenNotConfigured(t *testing.T) {
 	if config.Valid() {
 		t.Skip("SMTP configured in env; cannot test 503 path")
 	}
-	app := fiber.New(fiber.Config{DisableStartupMessage: true})
+	app := fiber.New()
 	log := logger.New(logger.Config{Level: logger.InfoLevel, ServiceName: "test"})
 	Setup(app, log)
 
@@ -54,7 +54,7 @@ func TestRouter_Send_503WhenNotConfigured(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestRouter_Send_200WhenInjectClient(t *testing.T) {
 			return provider.NewSuccessResult("smtp", provider.ChannelEmail, "inject-msg"), nil
 		},
 	}
-	app := fiber.New(fiber.Config{DisableStartupMessage: true})
+	app := fiber.New()
 	log := logger.New(logger.Config{Level: logger.InfoLevel, ServiceName: "test"})
 	setupWith(app, log, mock)
 
@@ -85,7 +85,7 @@ func TestRouter_Send_200WhenInjectClient(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/send", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
