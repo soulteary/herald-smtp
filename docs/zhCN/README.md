@@ -16,26 +16,28 @@
 
 - **[API.md](API.md)** - 完整 API 参考
   - Base URL 与认证
-  - POST /v1/send 请求/响应（to, subject, body）
-  - GET /healthz
+  - POST /v1/send 字段行为与可运行请求示例
+  - GET /healthz 的存活检查语义
   - 错误码与 HTTP 状态
-  - 幂等
+  - 幂等与 `message_id` 行为
 
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - 部署指南
   - 二进制与 Docker 运行
-  - 配置项
+  - 完整配置与 SMTP TLS 模式矩阵
+  - 健康检查、关闭行为与副本限制
   - 与 Herald 集成（HERALD_SMTP_API_URL）
 
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - 故障排查
   - 收不到邮件
   - 503 provider_down
   - 401 unauthorized
-  - invalid_destination、send_failed
-  - 幂等与日志
+  - HTTP 状态快速参考
+  - invalid_destination、send_failed、幂等与日志
 
 - **[SECURITY.md](SECURITY.md)** - 安全实践
   - API Key 使用
   - SMTP 凭证管理
+  - 请求元数据与日志暴露
   - 生产建议
 
 ## 快速导航

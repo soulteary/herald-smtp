@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/go-1.26+-blue.svg)](https://golang.org)
-[![Go Report Card](https://goreportcard.com/badge/github.com/soulteary/herald-smtp)](https://goreportcard.com/report/github.com/soulteary/herald-smtp)
+[![Go Report Card](.github/goreportcard.svg)](.github/goreportcard-report.md)
 
 ## 多语言文档
 
@@ -14,7 +14,7 @@ herald-smtp 是 [Herald](https://github.com/soulteary/herald) 的 SMTP 邮件适
 
 - **与 Herald HTTP Provider 协议一致**：实现 Herald 外部 Provider 的 HTTP 发送契约，请求/响应与 [provider-kit](https://github.com/soulteary/provider-kit) 的 `HTTPSendRequest` / `HTTPSendResponse` 对齐。
 - **可选 API Key 鉴权**：配置 `API_KEY` 后，Herald 需在请求头中携带 `X-API-Key`；未配置则无需鉴权。
-- **幂等**：支持 `Idempotency-Key`（或 body 中的 `idempotency_key`，最长 256 字节）；相同 key 和内容的请求共用一次 SMTP 发送，成功结果在配置的 TTL 内缓存。
+- **幂等**：支持 `Idempotency-Key`（或 body 中的 `idempotency_key`，最长 256 字节）；在单个进程内，相同 key 和内容的请求共用一次 SMTP 发送，成功结果在配置的 TTL 内缓存。
 - **SMTP 传输模式**：支持明文 SMTP、STARTTLS 和隐式 TLS，并对完整发送过程设置超时。
 - **优雅关闭**：收到 `SIGINT` 或 `SIGTERM` 后停止接收新请求，并在 10 秒超时内完成关闭。
 
@@ -46,9 +46,9 @@ sequenceDiagram
 - **POST /v1/send**  
   请求：`channel`（如 `email`）、`to`（邮箱地址）、`subject`、`body`（或 `params.code`）、`idempotency_key`，可选 `template`/`params`/`locale`。  
   响应：`{ "ok": true, "message_id": "...", "provider": "smtp" }` 或 `{ "ok": false, "error_code": "...", "error_message": "..." }`。
-- **GET /healthz**：`{ "status": "healthy", "service": "herald-smtp" }`（通过 [health-kit](https://github.com/soulteary/health-kit)）。
+- **GET /healthz**：存活检查端点，返回 `{ "status": "healthy", "service": "herald-smtp" }`；不会检查 SMTP 配置或连通性。
 
-## 配置
+## 基础配置
 
 | 变量 | 说明 | 默认值 | 必填 |
 |------|------|--------|------|
@@ -62,18 +62,8 @@ sequenceDiagram
 | `SMTP_FROM_NAME` | 可选的发件人显示名称 | `` | 否 |
 | `SMTP_USE_TLS` | 使用隐式 TLS（通常为 465 端口） | `false` | 否 |
 | `SMTP_USE_STARTTLS` | 使用 STARTTLS | `true` | 否 |
-| `SMTP_SKIP_TLS_VERIFY` | 跳过证书校验，仅限开发环境 | `false` | 否 |
-| `SMTP_TIMEOUT_SECONDS` | SMTP 完整发送过程的超时时间 | `30` | 否 |
-| `LOG_LEVEL` | 日志级别：trace, debug, info, warn, error | `info` | 否 |
-| `IDEMPOTENCY_TTL_SECONDS` | 幂等缓存 TTL（秒） | `300` | 否 |
-| `IDEMPOTENCY_MAX_ENTRIES` | 处理中及已缓存幂等键的最大总数 | `10000` | 否 |
-| `HTTP_BODY_LIMIT_BYTES` | HTTP 请求体大小上限 | `65536` | 否 |
-| `HTTP_READ_TIMEOUT_SECONDS` | HTTP 请求读取超时 | `10` | 否 |
-| `HTTP_WRITE_TIMEOUT_SECONDS` | HTTP 响应写入超时 | `40` | 否 |
-| `HTTP_IDLE_TIMEOUT_SECONDS` | HTTP 长连接空闲超时 | `60` | 否 |
 
-`SMTP_USE_TLS` 与 `SMTP_USE_STARTTLS` 不能同时启用。使用隐式 TLS 时，应设置 `SMTP_USE_TLS=true` 和 `SMTP_USE_STARTTLS=false`。
-实际 HTTP 写入超时始终不低于 `SMTP_TIMEOUT_SECONDS + 5` 秒。
+TLS 模式、超时、请求大小、幂等容量和全部环境变量请参阅[部署指南](docs/zhCN/DEPLOYMENT.md#环境变量)。
 
 ## Herald 侧配置
 
@@ -86,14 +76,33 @@ sequenceDiagram
 
 ## 快速开始
 
-### 构建与运行（二进制）
+### 构建与运行
 
 ```bash
+export SMTP_HOST=smtp.example.com
+export SMTP_PORT=587
+export SMTP_FROM=noreply@example.com
+export SMTP_USER=user
+export SMTP_PASSWORD=secret
+export API_KEY=replace-with-a-strong-random-value
+
 go build -o herald-smtp .
 ./herald-smtp
 ```
 
-在环境变量中配置 SMTP 凭证后，`POST /v1/send` 会向指定邮箱发送邮件。
+在另一个终端检查进程并发送测试请求：
+
+```bash
+curl -sS http://localhost:8084/healthz
+
+curl -sS -X POST http://localhost:8084/v1/send \
+  -H 'Content-Type: application/json' \
+  -H 'X-API-Key: replace-with-a-strong-random-value' \
+  -H 'Idempotency-Key: quickstart-001' \
+  -d '{"to":"recipient@example.com","subject":"Test","body":"Hello from herald-smtp"}'
+```
+
+使用前请替换示例主机、凭证、发件人、收件人和 API Key。`/healthz` 成功只表示进程正在运行，不代表 SMTP 一定可以发送。
 
 ### 使用 Docker 运行
 
@@ -109,6 +118,8 @@ docker run -d --name herald-smtp -p 8084:8084 \
 
 可选：增加 `-e API_KEY=your_shared_secret`，并在 Herald 侧将 `HERALD_SMTP_API_KEY` 设为相同值。
 
+> **扩容说明：** 幂等状态保存在进程内存中。多个副本之间不共享缓存，同一请求被路由到不同实例时仍可能重复发送。除非调用方提供共享幂等层，否则建议运行单副本。
+
 ## 文档
 
 - **[Documentation Index (English)](docs/enUS/README.md)** – [API](docs/enUS/API.md) | [Deployment](docs/enUS/DEPLOYMENT.md) | [Troubleshooting](docs/enUS/TROUBLESHOOTING.md) | [Security](docs/enUS/SECURITY.md)
@@ -117,7 +128,7 @@ docker run -d --name herald-smtp -p 8084:8084 \
 ## 测试
 
 ```bash
-go test ./...
+go test -race -cover ./...
 ```
 
 ## 许可证

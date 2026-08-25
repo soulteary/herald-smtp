@@ -16,26 +16,28 @@ Welcome to the herald-smtp documentation. herald-smtp is the SMTP email adapter 
 
 - **[API.md](API.md)** - Complete API reference
   - Base URL and authentication
-  - POST /v1/send request/response (to, subject, body)
-  - GET /healthz
+  - POST /v1/send field behavior and runnable request example
+  - GET /healthz liveness semantics
   - Error codes and HTTP status codes
-  - Idempotency
+  - Idempotency and `message_id` behavior
 
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deployment guide
   - Binary and Docker run
-  - Configuration options
+  - Complete configuration and SMTP TLS mode matrix
+  - Health checks, shutdown, and replica limits
   - Integration with Herald (HERALD_SMTP_API_URL)
 
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Troubleshooting guide
   - Email not received
   - 503 provider_down
   - 401 unauthorized
-  - invalid_destination, send_failed
-  - Idempotency and logs
+  - HTTP status quick reference
+  - invalid_destination, send_failed, idempotency, and logs
 
 - **[SECURITY.md](SECURITY.md)** - Security practices
   - API Key usage
   - SMTP credential management
+  - Request metadata and log exposure
   - Production recommendations
 
 ## Quick Navigation

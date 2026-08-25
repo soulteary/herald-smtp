@@ -7,6 +7,12 @@ This document describes security considerations and recommendations for herald-s
 - When `API_KEY` is set, herald-smtp requires the `X-API-Key` header to match for **POST /v1/send**. Use a strong, unique value and keep it secret.
 - Herald must be configured with the same value as `HERALD_SMTP_API_KEY` so that it sends the key on every request to herald-smtp.
 - Do not log or expose the API key. Prefer environment variables or a secret manager over config files committed to source control.
+- Ensure reverse proxies and access logs redact `X-API-Key`.
+
+## Request Metadata
+
+- Treat idempotency keys as non-secret correlation identifiers. A caller-supplied key can be returned and logged as `message_id`; never place passwords, access tokens, email addresses, or other sensitive data in it.
+- Error responses intentionally avoid exposing unexpected SMTP host, network, or connection details. Use protected service logs for diagnosis.
 
 ## SMTP Credentials
 
@@ -21,6 +27,7 @@ This document describes security considerations and recommendations for herald-s
 - **HTTPS**: If herald-smtp is reachable over the internet or across untrusted networks, put it behind a reverse proxy (e.g. Traefik, nginx) with TLS. Herald should use `https://` for `HERALD_SMTP_API_URL` in that case.
 - **Least privilege**: Run the process with a non-root user. The provided Docker image uses the dedicated `herald` user.
 - **Resource limits**: Keep request-size, HTTP timeout, and idempotency-capacity limits enabled. Tune them for expected traffic instead of disabling them with very large values.
+- **Replica model**: In-memory idempotency is local to one process. Multiple replicas require a shared idempotency layer if duplicate sends must be prevented across instances.
 - **Logging**: Avoid logging request bodies or headers that may contain secrets. Structured logs (e.g. masked `to`, `message_id`, error codes) are sufficient for operations and troubleshooting.
 
 ## Summary

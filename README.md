@@ -14,7 +14,7 @@ SMTP email adapter for [Herald](https://github.com/soulteary/herald). Herald for
 
 - **Herald HTTP Provider contract**: Implements the same HTTP send contract as Herald's external provider; request/response align with [provider-kit](https://github.com/soulteary/provider-kit) `HTTPSendRequest` / `HTTPSendResponse`.
 - **Optional API Key auth**: When `API_KEY` is set, Herald must send `X-API-Key`; otherwise no auth required.
-- **Idempotency**: Supports `Idempotency-Key` (or body `idempotency_key`, maximum 256 bytes); requests with the same key and content share one SMTP send, and successful results are cached for the configured TTL.
+- **Idempotency**: Supports `Idempotency-Key` (or body `idempotency_key`, maximum 256 bytes); requests with the same key and content share one SMTP send within a single process, and successful results are cached for the configured TTL.
 - **SMTP transport modes**: Supports plaintext SMTP, STARTTLS, and implicit TLS with bounded send timeouts.
 - **Graceful shutdown**: On `SIGINT` or `SIGTERM`, server stops accepting new requests and shuts down with a 10s timeout.
 
@@ -46,9 +46,9 @@ sequenceDiagram
 - **POST /v1/send**  
   Request: `channel` (e.g. `email`), `to` (email address), `subject`, `body` (or `params.code`), `idempotency_key`, optional `template`/`params`/`locale`.  
   Response: `{ "ok": true, "message_id": "...", "provider": "smtp" }` or `{ "ok": false, "error_code": "...", "error_message": "..." }`.
-- **GET /healthz**: `{ "status": "healthy", "service": "herald-smtp" }` (via [health-kit](https://github.com/soulteary/health-kit)).
+- **GET /healthz**: Liveness endpoint returning `{ "status": "healthy", "service": "herald-smtp" }`. It does not test SMTP configuration or connectivity.
 
-## Configuration
+## Essential Configuration
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
@@ -62,18 +62,8 @@ sequenceDiagram
 | `SMTP_FROM_NAME` | Optional sender display name | `` | No |
 | `SMTP_USE_TLS` | Use implicit TLS (typically port 465) | `false` | No |
 | `SMTP_USE_STARTTLS` | Use STARTTLS | `true` | No |
-| `SMTP_SKIP_TLS_VERIFY` | Skip certificate verification; development only | `false` | No |
-| `SMTP_TIMEOUT_SECONDS` | End-to-end SMTP send timeout | `30` | No |
-| `LOG_LEVEL` | Log level: trace, debug, info, warn, error | `info` | No |
-| `IDEMPOTENCY_TTL_SECONDS` | Idempotency cache TTL (seconds) | `300` | No |
-| `IDEMPOTENCY_MAX_ENTRIES` | Maximum in-flight and cached idempotency keys | `10000` | No |
-| `HTTP_BODY_LIMIT_BYTES` | Maximum HTTP request body size | `65536` | No |
-| `HTTP_READ_TIMEOUT_SECONDS` | HTTP request read timeout | `10` | No |
-| `HTTP_WRITE_TIMEOUT_SECONDS` | HTTP response write timeout | `40` | No |
-| `HTTP_IDLE_TIMEOUT_SECONDS` | HTTP keep-alive idle timeout | `60` | No |
 
-`SMTP_USE_TLS` and `SMTP_USE_STARTTLS` are mutually exclusive. For implicit TLS, set `SMTP_USE_TLS=true` and `SMTP_USE_STARTTLS=false`.
-The effective HTTP write timeout is always at least `SMTP_TIMEOUT_SECONDS + 5` seconds.
+See the [deployment guide](docs/enUS/DEPLOYMENT.md#environment-variables) for TLS modes, timeouts, request limits, idempotency limits, and the complete environment-variable reference.
 
 ## Herald side
 
@@ -86,14 +76,33 @@ When `HERALD_SMTP_API_URL` is set, Herald does not use built-in SMTP (no `SMTP_H
 
 ## Quick Start
 
-### Build & run (binary)
+### Build and run
 
 ```bash
+export SMTP_HOST=smtp.example.com
+export SMTP_PORT=587
+export SMTP_FROM=noreply@example.com
+export SMTP_USER=user
+export SMTP_PASSWORD=secret
+export API_KEY=replace-with-a-strong-random-value
+
 go build -o herald-smtp .
 ./herald-smtp
 ```
 
-With SMTP credentials in env, `POST /v1/send` will send email to the given address.
+In another terminal, verify liveness and send a test request:
+
+```bash
+curl -sS http://localhost:8084/healthz
+
+curl -sS -X POST http://localhost:8084/v1/send \
+  -H 'Content-Type: application/json' \
+  -H 'X-API-Key: replace-with-a-strong-random-value' \
+  -H 'Idempotency-Key: quickstart-001' \
+  -d '{"to":"recipient@example.com","subject":"Test","body":"Hello from herald-smtp"}'
+```
+
+Replace the example host, credentials, sender, recipient, and API key before use. A successful `/healthz` response only confirms that the process is running; it does not prove that SMTP sending works.
 
 ### Run with Docker
 
@@ -109,6 +118,8 @@ docker run -d --name herald-smtp -p 8084:8084 \
 
 Optional: add `-e API_KEY=your_shared_secret` and set `HERALD_SMTP_API_KEY` to the same value on Herald.
 
+> **Scaling note:** idempotency state is held in process memory. Multiple replicas do not share cached keys, so the same request routed to different replicas can be sent more than once. Use one replica unless the caller provides a shared idempotency layer.
+
 ## Documentation
 
 - **[Documentation Index (English)](docs/enUS/README.md)** – [API](docs/enUS/API.md) | [Deployment](docs/enUS/DEPLOYMENT.md) | [Troubleshooting](docs/enUS/TROUBLESHOOTING.md) | [Security](docs/enUS/SECURITY.md)
@@ -117,7 +128,7 @@ Optional: add `-e API_KEY=your_shared_secret` and set `HERALD_SMTP_API_KEY` to t
 ## Testing
 
 ```bash
-go test ./...
+go test -race -cover ./...
 ```
 
 ## License
