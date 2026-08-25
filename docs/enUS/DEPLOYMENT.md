@@ -20,6 +20,8 @@ docker build -t herald-smtp .
 
 # Run with env vars
 docker run -d --name herald-smtp -p 8084:8084 \
+  --health-cmd='curl -fsS http://localhost:8084/healthz || exit 1' \
+  --health-interval=30s --health-timeout=3s \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
@@ -60,6 +62,11 @@ services:
       # - API_KEY=${API_KEY}
       # - LOG_LEVEL=info
       # - IDEMPOTENCY_TTL_SECONDS=300
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8084/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
 ```
 
 ## Configuration
@@ -93,6 +100,26 @@ The effective HTTP write timeout is always at least `SMTP_TIMEOUT_SECONDS + 5` s
 
 When `SMTP_HOST` or `SMTP_FROM` is missing, `POST /v1/send` returns `503` with `error_code: "provider_down"`.
 
+### SMTP Transport Modes
+
+| Mode | Typical port | `SMTP_USE_TLS` | `SMTP_USE_STARTTLS` | Notes |
+|------|-------------:|:--------------:|:-------------------:|-------|
+| STARTTLS | 587 | `false` | `true` | Default and recommended when the SMTP service supports STARTTLS. |
+| Implicit TLS | 465 | `true` | `false` | TLS begins immediately after connecting. |
+| Plain SMTP | 25 or custom | `false` | `false` | Use only on a trusted private network. |
+
+Keep `SMTP_SKIP_TLS_VERIFY=false` outside isolated development environments.
+
+## Health and Shutdown
+
+- `/healthz` is a **liveness** endpoint. It confirms that the HTTP process can respond, but it does not check SMTP configuration, authentication, connectivity, or delivery.
+- The project does not currently expose a separate readiness endpoint. For readiness, combine process health with a configuration check in the deployment platform, and monitor real send failures separately.
+- On `SIGINT` or `SIGTERM`, the server stops accepting new requests and waits up to 10 seconds for HTTP shutdown. Each SMTP operation is also bounded by `SMTP_TIMEOUT_SECONDS`.
+
+## Replica and Idempotency Model
+
+Idempotency reservations and cached results live in process memory. They are not shared across containers or hosts. If the same key reaches different replicas, each replica can perform its own SMTP send. Run a single replica when local idempotency is required, or provide a shared idempotency layer in the caller or gateway before scaling out.
+
 ## Integration with Herald
 
 Herald calls herald-smtp over HTTP when the OTP channel is `email` and `HERALD_SMTP_API_URL` is set. Configure Herald with:
@@ -102,27 +129,4 @@ Herald calls herald-smtp over HTTP when the OTP channel is `email` and `HERALD_S
 
 When `HERALD_SMTP_API_URL` is set, Herald does not use built-in SMTP (no `SMTP_HOST` in Herald). All SMTP credentials live only in herald-smtp.
 
-### Data flow
-
-```mermaid
-sequenceDiagram
-  participant User
-  participant Stargate
-  participant Herald
-  participant HeraldSMTP as herald-smtp
-  participant SMTP as SMTP Server
-
-  User->>Stargate: Login (email)
-  Stargate->>Herald: Create challenge (channel=email, destination=email)
-  Herald->>HeraldSMTP: POST /v1/send (to, subject, body)
-  HeraldSMTP->>SMTP: SMTP send
-  SMTP-->>User: Email
-  HeraldSMTP-->>Herald: ok, message_id
-  Herald-->>Stargate: challenge_id, expires_in
-```
-
-High-level architecture:
-
-- **Stargate**: ForwardAuth / login orchestration.
-- **Herald**: OTP challenge creation and verification; calls herald-smtp for `email` channel when `HERALD_SMTP_API_URL` is set.
-- **herald-smtp**: HTTP adapter; sends email via SMTP; holds SMTP credentials.
+Herald should reuse one stable idempotency key for retries of the same logical send and must not reuse that key for different recipients or content.

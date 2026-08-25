@@ -20,11 +20,39 @@ docker build -t herald-smtp .
 
 # 运行并传入环境变量
 docker run -d --name herald-smtp -p 8084:8084 \
+  --health-cmd='curl -fsS http://localhost:8084/healthz || exit 1' \
+  --health-interval=30s --health-timeout=3s \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
   herald-smtp
+```
+
+### Docker Compose 示例
+
+```yaml
+services:
+  herald-smtp:
+    image: herald-smtp:latest
+    build: .
+    ports:
+      - "8084:8084"
+    environment:
+      - PORT=:8084
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_FROM=${SMTP_FROM}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      # 可选：
+      # - API_KEY=${API_KEY}
+      # - LOG_LEVEL=info
+      # - IDEMPOTENCY_TTL_SECONDS=300
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8084/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
 ```
 
 可选：若在 herald-smtp 上配置了 `API_KEY`，传入该值并在 Herald 侧将 `HERALD_SMTP_API_KEY` 设为相同值：
@@ -70,6 +98,26 @@ docker run -d --name herald-smtp -p 8084:8084 \
 
 当 `SMTP_HOST` 或 `SMTP_FROM` 缺失时，`POST /v1/send` 返回 `503`，`error_code` 为 `"provider_down"`。
 
+### SMTP 传输模式
+
+| 模式 | 常用端口 | `SMTP_USE_TLS` | `SMTP_USE_STARTTLS` | 说明 |
+|------|---------:|:--------------:|:-------------------:|------|
+| STARTTLS | 587 | `false` | `true` | 默认模式；SMTP 服务支持时优先使用。 |
+| 隐式 TLS | 465 | `true` | `false` | 建立连接后立即开始 TLS。 |
+| 明文 SMTP | 25 或自定义 | `false` | `false` | 仅用于可信私有网络。 |
+
+除隔离的开发环境外，应保持 `SMTP_SKIP_TLS_VERIFY=false`。
+
+## 健康检查与关闭
+
+- `/healthz` 是**存活检查**，仅确认 HTTP 进程能够响应，不检查 SMTP 配置、认证、网络连通性或最终投递。
+- 项目目前没有独立的就绪检查端点。部署平台可将进程存活与配置检查组合使用，并单独监控真实发送失败。
+- 收到 `SIGINT` 或 `SIGTERM` 后，服务停止接收新请求，HTTP 关闭最多等待 10 秒；每次 SMTP 操作还受 `SMTP_TIMEOUT_SECONDS` 限制。
+
+## 副本与幂等模型
+
+幂等预留和缓存结果保存在进程内存中，不会在容器或主机之间共享。如果同一 key 到达不同副本，每个副本都可能各自执行 SMTP 发送。需要依赖本地幂等时应运行单副本；需要横向扩容时，应由调用方或网关提供共享幂等层。
+
 ## 与 Herald 集成
 
 当 OTP 通道为 `email` 且 Herald 配置了 `HERALD_SMTP_API_URL` 时，Herald 通过 HTTP 调用 herald-smtp。在 Herald 中配置：
@@ -79,27 +127,4 @@ docker run -d --name herald-smtp -p 8084:8084 \
 
 设置 `HERALD_SMTP_API_URL` 后，Herald 不再使用内置 SMTP（Herald 中无需配置 `SMTP_HOST`）。所有 SMTP 凭证仅存在于 herald-smtp。
 
-### 数据流
-
-```mermaid
-sequenceDiagram
-  participant User
-  participant Stargate
-  participant Herald
-  participant HeraldSMTP as herald-smtp
-  participant SMTP as SMTP Server
-
-  User->>Stargate: 登录（邮箱）
-  Stargate->>Herald: 创建 challenge（channel=email, destination=email）
-  Herald->>HeraldSMTP: POST /v1/send（to, subject, body）
-  HeraldSMTP->>SMTP: SMTP 发送
-  SMTP-->>User: 邮件
-  HeraldSMTP-->>Herald: ok, message_id
-  Herald-->>Stargate: challenge_id, expires_in
-```
-
-高层架构：
-
-- **Stargate**：ForwardAuth / 登录编排。
-- **Herald**：OTP challenge 创建与校验；当配置 `HERALD_SMTP_API_URL` 时对 channel `email` 调用 herald-smtp。
-- **herald-smtp**：HTTP 适配层；通过 SMTP 发送邮件；持有 SMTP 凭证。
+Herald 对同一次逻辑发送的重试应复用稳定的幂等 key，不得将同一 key 用于不同收件人或不同内容。
