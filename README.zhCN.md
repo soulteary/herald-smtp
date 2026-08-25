@@ -14,7 +14,7 @@ herald-smtp 是 [Herald](https://github.com/soulteary/herald) 的 SMTP 邮件适
 
 - **与 Herald HTTP Provider 协议一致**：实现 Herald 外部 Provider 的 HTTP 发送契约，请求/响应与 [provider-kit](https://github.com/soulteary/provider-kit) 的 `HTTPSendRequest` / `HTTPSendResponse` 对齐。
 - **可选 API Key 鉴权**：配置 `API_KEY` 后，Herald 需在请求头中携带 `X-API-Key`；未配置则无需鉴权。
-- **幂等**：支持 `Idempotency-Key`（或 body 中的 `idempotency_key`）；TTL 内使用相同 key 和内容重复成功请求时，直接返回缓存结果，不再发送。
+- **幂等**：支持 `Idempotency-Key`（或 body 中的 `idempotency_key`，最长 256 字节）；相同 key 和内容的请求共用一次 SMTP 发送，成功结果在配置的 TTL 内缓存。
 - **SMTP 传输模式**：支持明文 SMTP、STARTTLS 和隐式 TLS，并对完整发送过程设置超时。
 - **优雅关闭**：收到 `SIGINT` 或 `SIGTERM` 后停止接收新请求，并在 10 秒超时内完成关闭。
 

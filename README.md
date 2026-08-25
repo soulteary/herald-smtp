@@ -14,7 +14,7 @@ SMTP email adapter for [Herald](https://github.com/soulteary/herald). Herald for
 
 - **Herald HTTP Provider contract**: Implements the same HTTP send contract as Herald's external provider; request/response align with [provider-kit](https://github.com/soulteary/provider-kit) `HTTPSendRequest` / `HTTPSendResponse`.
 - **Optional API Key auth**: When `API_KEY` is set, Herald must send `X-API-Key`; otherwise no auth required.
-- **Idempotency**: Supports `Idempotency-Key` (or body `idempotency_key`); a successful request repeated with the same key and content within the TTL returns the cached result without sending again.
+- **Idempotency**: Supports `Idempotency-Key` (or body `idempotency_key`, maximum 256 bytes); requests with the same key and content share one SMTP send, and successful results are cached for the configured TTL.
 - **SMTP transport modes**: Supports plaintext SMTP, STARTTLS, and implicit TLS with bounded send timeouts.
 - **Graceful shutdown**: On `SIGINT` or `SIGTERM`, server stops accepting new requests and shuts down with a 10s timeout.
 

@@ -123,7 +123,7 @@ SMTP 发送失败：连接被拒、认证失败、TLS 错误或服务器拒绝�
 
 ### 幂等命中（缓存响应）
 
-当 Herald（或任意客户端）在配置的 TTL 内，以相同 `Idempotency-Key`（或 body 中的 `idempotency_key`）重复提交内容一致且已成功的请求时，herald-smtp 会返回缓存响应而不再次发送。失败请求可继续重试；若同一 key 对应不同请求内容，则返回 `409 idempotency_conflict`。
+`Idempotency-Key`（或 body 中的 `idempotency_key`）最长 256 字节。使用相同 key 和内容的并发请求只触发一次 SMTP 发送，其余请求等待并复用成功结果；在配置的 TTL 内再次提交相同请求时，herald-smtp 会直接返回缓存响应。失败请求可继续重试；若同一 key 对应不同请求内容，则返回 `409 idempotency_conflict`。
 
 ### 日志级别
 

@@ -5,7 +5,7 @@ Thank you for your interest in contributing to herald-smtp.
 ## Development
 
 - **Go version**: 1.26+ (see [go.mod](go.mod)).
-- **Tests**: Run `go test ./...`. Use `go test -cover ./...` for coverage; `go test -coverprofile=coverage.out ./...` then `go tool cover -html=coverage.out` for an HTML report. Tests cover config (Valid) and idempotency.
+- **Tests**: Run `go test ./...`. Use `go test -cover ./...` for coverage; `go test -coverprofile=coverage.out ./...` then `go tool cover -html=coverage.out` for an HTML report. Tests cover configuration validation, handlers and routing, the SMTP adapter, and idempotency behavior.
 - **Code style**: Follow standard Go formatting. Run `gofmt -s -w .` before committing. The CI runs `gofmt -s -l .` and fails if there are unformatted files.
 - **Static analysis**: CI runs `go vet ./...`. Run `golangci-lint run` locally (e.g. errcheck) before submitting.
 
