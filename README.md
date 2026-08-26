@@ -18,7 +18,14 @@ The HTTP server uses Fiber v3 and the matching v2 module lines of the Fiber-faci
 - **Optional API Key auth**: When `API_KEY` is set, Herald must send `X-API-Key`; otherwise no auth required.
 - **Idempotency**: Supports `Idempotency-Key` (or body `idempotency_key`, maximum 256 bytes); requests with the same key and content share one SMTP send within a single process, and successful results are cached for the configured TTL.
 - **SMTP transport modes**: Supports plaintext SMTP, STARTTLS, and implicit TLS with bounded send timeouts.
-- **Graceful shutdown**: On `SIGINT` or `SIGTERM`, server stops accepting new requests and shuts down with a 10s timeout.
+- **Bounded SMTP concurrency**: Limits simultaneous SMTP sends with `SMTP_MAX_CONCURRENT_SENDS`; excess requests fail immediately with `429 rate_limited` instead of building an unbounded queue.
+- **Graceful shutdown**: On `SIGINT` or `SIGTERM`, the server stops accepting new requests and waits up to `SHUTDOWN_TIMEOUT_SECONDS`. The effective timeout is never shorter than `SMTP_TIMEOUT_SECONDS + 5` seconds.
+
+## v1 Compatibility
+
+Version 1 establishes the stable HTTP and operational contract for `/v1/send`, `/healthz`, `/readyz`, the documented environment variables, and the JSON success/error envelopes. Backward-compatible fields and endpoints may be added in minor releases; removing or changing documented behavior requires a new major version.
+
+A successful SMTP response means that the configured SMTP server accepted the message. It is not proof of final mailbox delivery. Readiness checks local SMTP client initialization only, and idempotency remains local to one process.
 
 ## Architecture
 
@@ -97,6 +104,7 @@ In another terminal, verify liveness and send a test request:
 
 ```bash
 curl -sS http://localhost:8084/healthz
+curl -fsS http://localhost:8084/readyz
 
 curl -sS -X POST http://localhost:8084/v1/send \
   -H 'Content-Type: application/json' \
@@ -110,16 +118,17 @@ Replace the example host, credentials, sender, recipient, and API key before use
 ### Run with Docker
 
 ```bash
-docker build -t herald-smtp .
-docker run -d --name herald-smtp -p 8084:8084 \
+docker pull ghcr.io/soulteary/herald-smtp:v1.0.0
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  herald-smtp
+  ghcr.io/soulteary/herald-smtp:v1.0.0
 ```
 
 Optional: add `-e API_KEY=your_shared_secret` and set `HERALD_SMTP_API_KEY` to the same value on Herald.
+For production, pin an exact release tag rather than `latest`. If `SMTP_TIMEOUT_SECONDS` makes the effective shutdown timeout exceed 40 seconds, increase `--stop-timeout` to match.
 
 > **Scaling note:** idempotency state is held in process memory. Multiple replicas do not share cached keys, so the same request routed to different replicas can be sent more than once. Use one replica unless the caller provides a shared idempotency layer.
 

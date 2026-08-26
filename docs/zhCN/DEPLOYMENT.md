@@ -15,8 +15,8 @@ go build -o herald-smtp .
 ### Docker
 
 ```bash
-# 构建镜像
-docker build -t herald-smtp .
+# 拉取固定版本
+docker pull ghcr.io/soulteary/herald-smtp:v1.0.0
 
 # 运行并传入环境变量
 docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
@@ -26,16 +26,17 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  herald-smtp
+  ghcr.io/soulteary/herald-smtp:v1.0.0
 ```
+
+如需构建当前源码，可运行 `docker build -t herald-smtp:local .`，并将示例中的镜像名替换为 `herald-smtp:local`。生产环境应固定使用具体版本标签，而不是 `latest`。
 
 ### Docker Compose 示例
 
 ```yaml
 services:
   herald-smtp:
-    image: herald-smtp:latest
-    build: .
+    image: ghcr.io/soulteary/herald-smtp:v1.0.0
     stop_grace_period: 40s
     ports:
       - "8084:8084"
@@ -48,6 +49,7 @@ services:
       # 可选：
       # - API_KEY=${API_KEY}
       # - LOG_LEVEL=info
+      # - SMTP_MAX_CONCURRENT_SENDS=16
       # - IDEMPOTENCY_TTL_SECONDS=300
       # - SHUTDOWN_TIMEOUT_SECONDS=40
     healthcheck:
@@ -66,7 +68,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  herald-smtp
+  ghcr.io/soulteary/herald-smtp:v1.0.0
 ```
 
 ## 配置
@@ -101,6 +103,8 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
 实际 HTTP 写入超时始终不低于 `SMTP_TIMEOUT_SECONDS + 5` 秒，确保 SMTP 操作能在响应截止时间前完成。
 
 当 `SMTP_HOST` 或 `SMTP_FROM` 缺失时，`POST /v1/send` 返回 `503`，`error_code` 为 `"provider_down"`。
+
+`SMTP_MAX_CONCURRENT_SENDS` 是非阻塞容量限制。所有发送槽位均被占用时，新请求会立即返回 `429 rate_limited`，不会进入无界等待队列。应结合 SMTP 服务商的连接限制以及容器的 CPU、内存和文件描述符预算进行调整。
 
 ### SMTP 传输模式
 

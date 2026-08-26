@@ -2,6 +2,15 @@
 
 This document describes security considerations and recommendations for herald-smtp.
 
+## Supported Versions
+
+Starting with v1.0.0, security fixes are provided for the current `1.x` release line. Pre-1.0 releases are no longer supported.
+
+| Version | Supported |
+|---------|-----------|
+| `1.x` | Yes |
+| `<1.0` | No |
+
 ## API Key
 
 - When `API_KEY` is set, herald-smtp requires the `X-API-Key` header to match for **POST /v1/send**. Use a strong, unique value and keep it secret.
@@ -26,7 +35,7 @@ This document describes security considerations and recommendations for herald-s
 - **Network**: Run herald-smtp in a private network. Only Herald (or your gateway) should call it; do not expose herald-smtp directly to the public internet unless behind HTTPS and strict access control.
 - **HTTPS**: If herald-smtp is reachable over the internet or across untrusted networks, put it behind a reverse proxy (e.g. Traefik, nginx) with TLS. Herald should use `https://` for `HERALD_SMTP_API_URL` in that case.
 - **Least privilege**: Run the process with a non-root user. The provided Docker image uses the dedicated `herald` user.
-- **Resource limits**: Keep request-size, HTTP timeout, and idempotency-capacity limits enabled. Tune them for expected traffic instead of disabling them with very large values.
+- **Resource limits**: Keep request-size, HTTP timeout, SMTP concurrency, and idempotency-capacity limits enabled. Tune them for expected traffic instead of disabling them with very large values.
 - **Replica model**: In-memory idempotency is local to one process. Multiple replicas require a shared idempotency layer if duplicate sends must be prevented across instances.
 - **Logging**: Avoid logging request bodies or headers that may contain secrets. Structured logs (e.g. masked `to`, `message_id`, error codes) are sufficient for operations and troubleshooting.
 

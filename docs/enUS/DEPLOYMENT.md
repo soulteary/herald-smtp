@@ -15,8 +15,8 @@ go build -o herald-smtp .
 ### Docker
 
 ```bash
-# Build image
-docker build -t herald-smtp .
+# Pull a fixed release
+docker pull ghcr.io/soulteary/herald-smtp:v1.0.0
 
 # Run with env vars
 docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
@@ -26,8 +26,10 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  herald-smtp
+  ghcr.io/soulteary/herald-smtp:v1.0.0
 ```
+
+To build the current source instead, run `docker build -t herald-smtp:local .` and substitute `herald-smtp:local` for the image name. Use a fixed release tag in production rather than `latest`.
 
 Optional: if you use `API_KEY` on herald-smtp, pass it and use the same value in Herald as `HERALD_SMTP_API_KEY`:
 
@@ -38,7 +40,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  herald-smtp
+  ghcr.io/soulteary/herald-smtp:v1.0.0
 ```
 
 ### Docker Compose (example)
@@ -48,8 +50,7 @@ Minimal example for herald-smtp only:
 ```yaml
 services:
   herald-smtp:
-    image: herald-smtp:latest
-    build: .
+    image: ghcr.io/soulteary/herald-smtp:v1.0.0
     stop_grace_period: 40s
     ports:
       - "8084:8084"
@@ -62,6 +63,7 @@ services:
       # Optional:
       # - API_KEY=${API_KEY}
       # - LOG_LEVEL=info
+      # - SMTP_MAX_CONCURRENT_SENDS=16
       # - IDEMPOTENCY_TTL_SECONDS=300
       # - SHUTDOWN_TIMEOUT_SECONDS=40
     healthcheck:
@@ -103,6 +105,8 @@ services:
 The effective HTTP write timeout is always at least `SMTP_TIMEOUT_SECONDS + 5` seconds so an SMTP operation can finish before the response deadline.
 
 When `SMTP_HOST` or `SMTP_FROM` is missing, `POST /v1/send` returns `503` with `error_code: "provider_down"`.
+
+`SMTP_MAX_CONCURRENT_SENDS` is a non-blocking capacity limit. When all slots are occupied, a new send returns `429 rate_limited` immediately rather than waiting in an unbounded queue. Tune it against the SMTP provider's connection limits and the container's CPU, memory, and file-descriptor budget.
 
 ### SMTP Transport Modes
 

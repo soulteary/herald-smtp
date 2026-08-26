@@ -18,7 +18,14 @@ HTTP 服务使用 Fiber v3 及与之匹配的 Fiber 相关 kit v2 模块版本�
 - **可选 API Key 鉴权**：配置 `API_KEY` 后，Herald 需在请求头中携带 `X-API-Key`；未配置则无需鉴权。
 - **幂等**：支持 `Idempotency-Key`（或 body 中的 `idempotency_key`，最长 256 字节）；在单个进程内，相同 key 和内容的请求共用一次 SMTP 发送，成功结果在配置的 TTL 内缓存。
 - **SMTP 传输模式**：支持明文 SMTP、STARTTLS 和隐式 TLS，并对完整发送过程设置超时。
-- **优雅关闭**：收到 `SIGINT` 或 `SIGTERM` 后停止接收新请求，并在 10 秒超时内完成关闭。
+- **SMTP 并发边界**：通过 `SMTP_MAX_CONCURRENT_SENDS` 限制同时发送数量；容量用尽时立即返回 `429 rate_limited`，不会形成无界等待队列。
+- **优雅关闭**：收到 `SIGINT` 或 `SIGTERM` 后停止接收新请求，并按 `SHUTDOWN_TIMEOUT_SECONDS` 等待；实际超时不会短于 `SMTP_TIMEOUT_SECONDS + 5` 秒。
+
+## v1 兼容性
+
+v1 将 `/v1/send`、`/healthz`、`/readyz`、已记录的环境变量以及 JSON 成功/错误结构确立为稳定的 HTTP 与运维契约。小版本可以增加向后兼容的字段和端点；删除或改变已记录行为需要发布新的主版本。
+
+SMTP 返回成功表示配置的 SMTP 服务器已接受邮件，不代表最终投递到收件箱。就绪检查仅验证本地 SMTP Client 初始化状态，幂等状态仍只在单个进程内有效。
 
 ## 架构
 
@@ -97,6 +104,7 @@ go build -o herald-smtp .
 
 ```bash
 curl -sS http://localhost:8084/healthz
+curl -fsS http://localhost:8084/readyz
 
 curl -sS -X POST http://localhost:8084/v1/send \
   -H 'Content-Type: application/json' \
@@ -110,16 +118,17 @@ curl -sS -X POST http://localhost:8084/v1/send \
 ### 使用 Docker 运行
 
 ```bash
-docker build -t herald-smtp .
-docker run -d --name herald-smtp -p 8084:8084 \
+docker pull ghcr.io/soulteary/herald-smtp:v1.0.0
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  herald-smtp
+  ghcr.io/soulteary/herald-smtp:v1.0.0
 ```
 
 可选：增加 `-e API_KEY=your_shared_secret`，并在 Herald 侧将 `HERALD_SMTP_API_KEY` 设为相同值。
+生产环境应固定使用具体版本标签，而不是 `latest`。如果 `SMTP_TIMEOUT_SECONDS` 使实际关闭超时超过 40 秒，应同步增大 `--stop-timeout`。
 
 > **扩容说明：** 幂等状态保存在进程内存中。多个副本之间不共享缓存，同一请求被路由到不同实例时仍可能重复发送。除非调用方提供共享幂等层，否则建议运行单副本。
 
