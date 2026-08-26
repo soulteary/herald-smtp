@@ -160,7 +160,7 @@ func TestClientSMTPProtocolIntegration(t *testing.T) {
 	select {
 	case wireMessage := <-server.messages:
 		for _, expected := range []string{
-			"From: Herald <sender@example.com>",
+			"From: \"Herald\" <sender@example.com>",
 			"To: recipient@example.com",
 			"Content-Type: text/plain; charset=UTF-8",
 			"hello from herald-smtp",
