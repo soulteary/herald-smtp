@@ -19,6 +19,7 @@ var (
 	UseStartTLS         = env.GetBool("SMTP_USE_STARTTLS", true)
 	SkipTLSVerify       = env.GetBool("SMTP_SKIP_TLS_VERIFY", false)
 	SMTPTimeoutSec      = env.GetInt("SMTP_TIMEOUT_SECONDS", 30)
+	SMTPMaxConcurrent   = env.GetInt("SMTP_MAX_CONCURRENT_SENDS", 16)
 	LogLevel            = env.Get("LOG_LEVEL", "info")
 	IdemTTLSec          = env.GetInt("IDEMPOTENCY_TTL_SECONDS", 300)
 	IdemMaxEntries      = env.GetInt("IDEMPOTENCY_MAX_ENTRIES", 10000)
@@ -30,6 +31,7 @@ var (
 
 const (
 	defaultSMTPTimeoutSec      = 30
+	defaultSMTPMaxConcurrent   = 16
 	defaultIdemMaxEntries      = 10000
 	defaultHTTPBodyLimitBytes  = 64 * 1024
 	defaultHTTPReadTimeoutSec  = 10
@@ -45,6 +47,11 @@ func Valid() bool {
 // SMTPTimeout returns a reasonable send timeout (used when building provider-kit SMTPConfig).
 func SMTPTimeout() time.Duration {
 	return positiveDuration(SMTPTimeoutSec, defaultSMTPTimeoutSec)
+}
+
+// SMTPMaxConcurrentSends bounds simultaneous SMTP connections.
+func SMTPMaxConcurrentSends() int {
+	return positiveInt(SMTPMaxConcurrent, defaultSMTPMaxConcurrent)
 }
 
 // IdempotencyMaxEntries returns the maximum number of in-flight and cached keys.

@@ -85,6 +85,7 @@ docker run -d --name herald-smtp -p 8084:8084 \
 | `SMTP_USE_STARTTLS` | 使用 STARTTLS | `true` | 否 |
 | `SMTP_SKIP_TLS_VERIFY` | 跳过证书校验，仅限开发环境 | `false` | 否 |
 | `SMTP_TIMEOUT_SECONDS` | SMTP 完整发送过程的超时时间 | `30` | 否 |
+| `SMTP_MAX_CONCURRENT_SENDS` | 同时进行的 SMTP 发送数量上限 | `16` | 否 |
 | `LOG_LEVEL` | 日志级别：trace, debug, info, warn, error | `info` | 否 |
 | `IDEMPOTENCY_TTL_SECONDS` | 幂等缓存 TTL（秒） | `300` | 否 |
 | `IDEMPOTENCY_MAX_ENTRIES` | 处理中及已缓存幂等键的最大总数 | `10000` | 否 |

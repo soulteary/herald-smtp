@@ -87,6 +87,7 @@ services:
 | `SMTP_USE_STARTTLS` | Use STARTTLS | `true` | No |
 | `SMTP_SKIP_TLS_VERIFY` | Skip certificate verification; development only | `false` | No |
 | `SMTP_TIMEOUT_SECONDS` | End-to-end SMTP send timeout | `30` | No |
+| `SMTP_MAX_CONCURRENT_SENDS` | Maximum simultaneous SMTP sends | `16` | No |
 | `LOG_LEVEL` | Log level: trace, debug, info, warn, error | `info` | No |
 | `IDEMPOTENCY_TTL_SECONDS` | Idempotency cache TTL in seconds | `300` | No |
 | `IDEMPOTENCY_MAX_ENTRIES` | Maximum in-flight and cached idempotency keys | `10000` | No |
