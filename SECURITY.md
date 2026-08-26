@@ -1,5 +1,14 @@
 # Security
 
+## Supported Versions
+
+Starting with v1.0.0, security fixes are provided for the current `1.x` release line. Pre-1.0 releases are no longer supported.
+
+| Version | Supported |
+|---------|-----------|
+| `1.x` | Yes |
+| `<1.0` | No |
+
 Security practices for herald-smtp are documented in the docs:
 
 - **[English](docs/enUS/SECURITY.md)** – API Key usage, SMTP credential management, production recommendations

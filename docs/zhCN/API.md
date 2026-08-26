@@ -36,6 +36,23 @@ http://localhost:8084
 
 SMTP Client 初始化成功时返回 HTTP `200` 和 `status: ready`；SMTP 配置缺失或无效时返回 HTTP `503` 和 `status: not_ready`。该检查只验证本地初始化状态，不会连接 SMTP 服务器，也不代表邮件最终投递成功。
 
+**就绪响应 – HTTP 200：**
+```json
+{
+  "status": "ready",
+  "service": "herald-smtp"
+}
+```
+
+**未就绪响应 – HTTP 503：**
+```json
+{
+  "status": "not_ready",
+  "service": "herald-smtp",
+  "reason": "smtp_not_configured"
+}
+```
+
 ### 发送（SMTP 邮件）
 
 **POST /v1/send**
@@ -102,14 +119,16 @@ curl -sS -X POST http://localhost:8084/v1/send \
 | error_code | HTTP 状态 | 说明 |
 |------------|-----------|------|
 | `unauthorized` | 401 | 已配置 `API_KEY` 但未传或错误的 `X-API-Key`。 |
-| `invalid_request` | 400 | 请求体解析失败（无效 JSON）。 |
+| `invalid_request` | 400 或 413 | 请求解析失败、幂等 key 冲突或过长，或请求体超过配置上限。 |
 | `invalid_destination` | 400 | `to` 缺失或为空。 |
 | `validation_failed` | 400 | 收件地址或邮件头校验失败。 |
 | `idempotency_conflict` | 409 | 幂等键与已有请求冲突。 |
-| `rate_limited` | 429 | 上游服务触发限流，或幂等存储达到容量上限。 |
+| `rate_limited` | 429 | SMTP 并发容量用尽、上游服务触发限流，或幂等存储达到容量上限。 |
 | `provider_down` | 503 | 未配置 SMTP（SMTP_HOST / SMTP_FROM 未设置）。 |
 | `timeout` | 504 | SMTP 发送超过截止时间。 |
 | `send_failed` | 500 | SMTP 发送错误（连接、认证或服务器错误）。 |
+| `not_found` | 404 | 没有与请求路径匹配的路由。 |
+| `method_not_allowed` | 405 | 路由不支持当前 HTTP 方法。 |
 
 超过 `HTTP_BODY_LIMIT_BYTES` 的请求体会在 JSON 解析前由 HTTP 服务器以 `413` 状态拒绝。经由 Fiber Handler 返回的路由不存在、方法不支持和请求实体过大等错误使用与 `/v1/send` 相同的 JSON 响应结构。Fasthttp 的底层请求体限制可能在进入 Fiber Handler 前直接拒绝请求。
 
@@ -123,3 +142,7 @@ curl -sS -X POST http://localhost:8084/v1/send \
 - 存储容量由 `IDEMPOTENCY_MAX_ENTRIES` 限制（默认 10000）。全部槽位占用时，新 key 返回 `429 rate_limited`，已有 key 仍可继续使用。
 - 状态仅存在于单个进程。多个副本之间不共享预留或缓存，同一 key 被路由到不同实例时可能触发多次 SMTP 发送。
 - 不要在幂等 key 中放入密码、Token、邮箱地址或其他秘密。该 key 可能作为 `message_id` 返回并进入结构化日志。
+
+## SMTP 并发
+
+`SMTP_MAX_CONCURRENT_SENDS` 限制同时调用 SMTP Provider 的数量（默认 16）。限制仅在当前进程内生效，并且不会阻塞等待：所有槽位均被占用时，新请求会立即收到 `429 rate_limited`。服务不会建立无界 SMTP 发送队列。

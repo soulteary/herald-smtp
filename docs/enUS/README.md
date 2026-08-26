@@ -11,6 +11,7 @@ Welcome to the herald-smtp documentation. herald-smtp is the SMTP email adapter 
 ### Core Documents
 
 - **[README.md](../../README.md)** - Project overview and quick start guide
+- **[CHANGELOG.md](../../CHANGELOG.md)** - Release history and the v1 compatibility baseline
 
 ### Detailed Documents
 
@@ -18,8 +19,9 @@ Welcome to the herald-smtp documentation. herald-smtp is the SMTP email adapter 
   - Base URL and authentication
   - POST /v1/send field behavior and runnable request example
   - GET /healthz liveness semantics
+  - GET /readyz local SMTP readiness semantics
   - Error codes and HTTP status codes
-  - Idempotency and `message_id` behavior
+  - Idempotency, SMTP concurrency, and `message_id` behavior
 
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deployment guide
   - Binary and Docker run

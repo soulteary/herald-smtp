@@ -11,6 +11,7 @@
 ### 核心文档
 
 - **[README.md](../../README.md)** - 项目概览与快速开始
+- **[CHANGELOG.md](../../CHANGELOG.md)** - 发布历史与 v1 兼容性基线
 
 ### 详细文档
 
@@ -18,8 +19,9 @@
   - Base URL 与认证
   - POST /v1/send 字段行为与可运行请求示例
   - GET /healthz 的存活检查语义
+  - GET /readyz 的本地 SMTP 就绪语义
   - 错误码与 HTTP 状态
-  - 幂等与 `message_id` 行为
+  - 幂等、SMTP 并发与 `message_id` 行为
 
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - 部署指南
   - 二进制与 Docker 运行

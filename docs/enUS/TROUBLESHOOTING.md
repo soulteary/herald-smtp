@@ -7,6 +7,7 @@ This guide helps you diagnose and resolve common issues with herald-smtp.
 - [Email Not Received](#email-not-received)
 - [503 provider_down](#503-provider_down)
 - [401 Unauthorized](#401-unauthorized)
+- [429 rate_limited](#429-rate_limited)
 - [invalid_destination](#invalid_destination)
 - [send_failed](#send_failed)
 - [HTTP Status Quick Reference](#http-status-quick-reference)
@@ -20,12 +21,13 @@ This guide helps you diagnose and resolve common issues with herald-smtp.
 | 401 | Missing or mismatched API key | `API_KEY` and `X-API-Key` |
 | 409 | Same idempotency key used for different request content | Caller key generation and reuse |
 | 413 | Request exceeds `HTTP_BODY_LIMIT_BYTES` | Body size and configured limit |
-| 429 | Provider limit or idempotency store capacity | Provider quota and `IDEMPOTENCY_MAX_ENTRIES` |
+| 429 | SMTP concurrency, provider limit, or idempotency store capacity | Error message, `SMTP_MAX_CONCURRENT_SENDS`, and `IDEMPOTENCY_MAX_ENTRIES` |
 | 503 | SMTP is not configured or cannot be initialized | Startup logs, `SMTP_HOST`, `SMTP_FROM`, TLS mode |
 | 504 | Send or idempotency wait exceeded its deadline | SMTP latency and timeout settings |
 | 500 | SMTP send failed or an unexpected internal failure occurred | Server logs; the HTTP message is intentionally generic |
 
 `GET /healthz` is a liveness check only. A 200 response does not rule out SMTP configuration, authentication, connectivity, or delivery problems.
+Use `GET /readyz` for local SMTP configuration readiness; it still does not test network connectivity or final delivery.
 
 ## Email Not Received
 
@@ -136,6 +138,22 @@ The SMTP send failed because of connection, authentication, TLS, or server rejec
 
 ---
 
+## 429 rate_limited
+
+### Symptoms
+
+- `POST /v1/send` returns HTTP 429 with `error_code: "rate_limited"`.
+
+### Causes and solutions
+
+- **SMTP concurrency is full**: the error message is `maximum concurrent SMTP sends reached`. Reduce request fan-out, retry with bounded backoff and the same idempotency key, or raise `SMTP_MAX_CONCURRENT_SENDS` only within the SMTP provider and container resource limits.
+- **Idempotency capacity is full**: the error message is `too many active idempotency keys`. Reduce unique-key churn, wait for entries to expire, or raise `IDEMPOTENCY_MAX_ENTRIES` within the memory budget.
+- **SMTP provider throttling**: inspect protected server logs and the provider's quota. Keep retries bounded and reuse the same idempotency key for the same logical send.
+
+The local SMTP concurrency limit is deliberately non-blocking, so excess requests fail immediately instead of accumulating in memory.
+
+---
+
 ## Idempotency and Logs
 
 ### Idempotent hit (cached response)
@@ -155,4 +173,4 @@ Do not use secrets or personal data as idempotency keys. A supplied key can be r
 
 Idempotency cache TTL is controlled by `IDEMPOTENCY_TTL_SECONDS` (default 300). After TTL, the same key is treated as a new request and may trigger a new send.
 
-If a new key returns `429 rate_limited`, the in-memory store has reached `IDEMPOTENCY_MAX_ENTRIES` (default 10000). Existing keys remain available. Reduce unique-key churn, wait for entries to expire, or raise the limit within the service's memory budget.
+If every new key returns `429 rate_limited` while existing keys still work, the in-memory store may have reached `IDEMPOTENCY_MAX_ENTRIES` (default 10000). Check the error message to distinguish this from the SMTP concurrency limit.

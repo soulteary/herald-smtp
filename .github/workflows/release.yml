@@ -19,17 +19,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
       - name: Set up Go environment
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
 
       - name: Cache Go modules
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ~/.cache/go-build
@@ -49,19 +49,25 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           VERSION=${VERSION#v}
-          COMMIT=$(git rev-parse --short HEAD)
-          BUILD_DATE=$(date -u +%FT%T%z)
+          TAG=${GITHUB_REF#refs/tags/}
+          COMMIT=${GITHUB_SHA}
+          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          PRERELEASE=false
+          if [[ "${TAG}" == *-* ]]; then
+            PRERELEASE=true
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "commit=$COMMIT" >> $GITHUB_OUTPUT
           echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
 
       - name: Build multi-platform binaries
         run: |
           mkdir -p dist
           VERSION=${{ steps.version.outputs.version }}
-          COMMIT=${{ github.sha }}
-          BUILD_DATE=$(date +%FT%T%z)
+          COMMIT=${{ steps.version.outputs.commit }}
+          BUILD_DATE=${{ steps.version.outputs.build_date }}
           LDFLAGS="-s -w -X 'github.com/soulteary/version-kit/v2.Version=${VERSION}' -X 'github.com/soulteary/version-kit/v2.Commit=${COMMIT}' -X 'github.com/soulteary/version-kit/v2.BuildDate=${BUILD_DATE}'"
 
           # Build for multiple platforms
@@ -75,17 +81,18 @@ jobs:
       - name: Generate checksums
         run: |
           cd dist
-          # Exclude checksums.txt itself: `sha256sum *` can sweep the manifest
-          # into its own listing (a self-referential line whose hash never
-          # matches the final file), which later makes `sha256sum -c` report
-          # "checksums.txt: FAILED". Hash every artifact EXCEPT the manifest.
-          sha256sum $(ls | grep -v '^checksums.txt$') > checksums.txt
+          sha256sum herald-smtp-* > checksums.txt
+
+      - name: Verify checksums
+        run: |
+          cd dist
+          sha256sum -c checksums.txt
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Login to container registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -93,7 +100,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -101,10 +108,9 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: ./Dockerfile
@@ -120,7 +126,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             dist/*
@@ -128,7 +134,7 @@ jobs:
           body: |
             ## Changes
 
-            See [CHANGELOG](CHANGELOG.md) for details.
+            See [CHANGELOG](${{ github.server_url }}/${{ github.repository }}/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md) for details.
 
             ## Downloads
 
@@ -148,4 +154,5 @@ jobs:
             ### Checksums
             See `checksums.txt` for SHA256 checksums.
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          make_latest: ${{ steps.version.outputs.prerelease == 'false' }}

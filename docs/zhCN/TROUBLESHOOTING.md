@@ -7,6 +7,7 @@
 - [收不到邮件](#收不到邮件)
 - [503 provider_down](#503-provider_down)
 - [401 Unauthorized](#401-unauthorized)
+- [429 rate_limited](#429-rate_limited)
 - [invalid_destination](#invalid_destination)
 - [send_failed](#send_failed)
 - [HTTP 状态快速参考](#http-状态快速参考)
@@ -20,12 +21,13 @@
 | 401 | API Key 缺失或不匹配 | `API_KEY` 和 `X-API-Key` |
 | 409 | 同一幂等 key 被用于不同请求内容 | 调用方生成和复用 key 的逻辑 |
 | 413 | 请求超过 `HTTP_BODY_LIMIT_BYTES` | 请求体大小和配置上限 |
-| 429 | Provider 限流或幂等存储容量不足 | Provider 配额和 `IDEMPOTENCY_MAX_ENTRIES` |
+| 429 | SMTP 并发容量、Provider 限流或幂等存储容量不足 | 错误信息、`SMTP_MAX_CONCURRENT_SENDS` 和 `IDEMPOTENCY_MAX_ENTRIES` |
 | 503 | SMTP 未配置或无法初始化 | 启动日志、`SMTP_HOST`、`SMTP_FROM` 和 TLS 模式 |
 | 504 | 发送或幂等等待超过截止时间 | SMTP 延迟和超时配置 |
 | 500 | SMTP 发送失败或出现意外内部错误 | 服务端日志；HTTP 错误信息会刻意保持通用 |
 
 `GET /healthz` 只是存活检查。返回 200 不能排除 SMTP 配置、认证、网络连通性或最终投递问题。
+可使用 `GET /readyz` 检查本地 SMTP 配置就绪状态；该端点仍不会测试网络连通性或最终投递。
 
 ## 收不到邮件
 
@@ -136,6 +138,22 @@ SMTP 发送因连接、认证、TLS 或服务器拒绝而失败。详细传输�
 
 ---
 
+## 429 rate_limited
+
+### 现象
+
+- `POST /v1/send` 返回 HTTP 429，`error_code: "rate_limited"`。
+
+### 原因与处理
+
+- **SMTP 并发已满**：错误信息为 `maximum concurrent SMTP sends reached`。降低请求扇出，使用有上限的退避策略并复用同一幂等 key，或仅在 SMTP 服务商和容器资源允许时提高 `SMTP_MAX_CONCURRENT_SENDS`。
+- **幂等容量已满**：错误信息为 `too many active idempotency keys`。减少唯一 key 的产生速度、等待条目过期，或在内存预算内提高 `IDEMPOTENCY_MAX_ENTRIES`。
+- **SMTP 服务商限流**：检查受保护的服务端日志和服务商配额；重试必须有上限，同一次逻辑发送应复用相同幂等 key。
+
+本地 SMTP 并发限制不会阻塞等待，超出容量的请求会立即失败，避免在内存中持续堆积。
+
+---
+
 ## 幂等与日志
 
 ### 幂等命中（缓存响应）
@@ -155,4 +173,4 @@ SMTP 发送因连接、认证、TLS 或服务器拒绝而失败。详细传输�
 
 幂等缓存 TTL 由 `IDEMPOTENCY_TTL_SECONDS`（默认 300）控制。超过 TTL 后，相同 key 会被视为新请求并可能触发新的发送。
 
-如果新 key 返回 `429 rate_limited`，表示内存存储已达到 `IDEMPOTENCY_MAX_ENTRIES`（默认 10000）。已有 key 仍可使用；可减少唯一 key 的产生速度、等待条目过期，或在服务内存预算内提高上限。
+如果所有新 key 都返回 `429 rate_limited` 而已有 key 仍可使用，内存存储可能已达到 `IDEMPOTENCY_MAX_ENTRIES`（默认 10000）。应结合错误信息区分该情况和 SMTP 并发容量用尽。
