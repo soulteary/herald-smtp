@@ -114,7 +114,7 @@ Keep `SMTP_SKIP_TLS_VERIFY=false` outside isolated development environments.
 ## Health and Shutdown
 
 - `/healthz` is a **liveness** endpoint. It confirms that the HTTP process can respond, but it does not check SMTP configuration, authentication, connectivity, or delivery.
-- The project does not currently expose a separate readiness endpoint. For readiness, combine process health with a configuration check in the deployment platform, and monitor real send failures separately.
+- `/readyz` is a **readiness** endpoint. It returns success only when the SMTP client was initialized from valid local configuration; it does not test SMTP network connectivity or delivery.
 - On `SIGINT` or `SIGTERM`, the server stops accepting new requests and waits up to 10 seconds for HTTP shutdown. Each SMTP operation is also bounded by `SMTP_TIMEOUT_SECONDS`.
 
 ## Replica and Idempotency Model

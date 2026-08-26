@@ -30,6 +30,12 @@ Check whether the HTTP process is alive. Implemented via [health-kit](https://gi
 }
 ```
 
+### Readiness Check
+
+**GET /readyz**
+
+Returns HTTP `200` with `status: ready` when the SMTP client was initialized successfully. Returns HTTP `503` with `status: not_ready` when SMTP configuration is missing or invalid. This validates local initialization only; it does not connect to the SMTP server or prove final delivery.
+
 ### Send (SMTP Email)
 
 **POST /v1/send**
