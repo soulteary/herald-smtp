@@ -19,7 +19,7 @@ go build -o herald-smtp .
 docker build -t herald-smtp .
 
 # Run with env vars
-docker run -d --name herald-smtp -p 8084:8084 \
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   --health-cmd='curl -fsS http://localhost:8084/healthz || exit 1' \
   --health-interval=30s --health-timeout=3s \
   -e SMTP_HOST=smtp.example.com \
@@ -32,7 +32,7 @@ docker run -d --name herald-smtp -p 8084:8084 \
 Optional: if you use `API_KEY` on herald-smtp, pass it and use the same value in Herald as `HERALD_SMTP_API_KEY`:
 
 ```bash
-docker run -d --name herald-smtp -p 8084:8084 \
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e API_KEY=your_shared_secret \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
@@ -50,6 +50,7 @@ services:
   herald-smtp:
     image: herald-smtp:latest
     build: .
+    stop_grace_period: 40s
     ports:
       - "8084:8084"
     environment:
@@ -62,6 +63,7 @@ services:
       # - API_KEY=${API_KEY}
       # - LOG_LEVEL=info
       # - IDEMPOTENCY_TTL_SECONDS=300
+      # - SHUTDOWN_TIMEOUT_SECONDS=40
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8084/healthz"]
       interval: 30s
@@ -95,6 +97,7 @@ services:
 | `HTTP_READ_TIMEOUT_SECONDS` | HTTP request read timeout | `10` | No |
 | `HTTP_WRITE_TIMEOUT_SECONDS` | HTTP response write timeout | `40` | No |
 | `HTTP_IDLE_TIMEOUT_SECONDS` | HTTP keep-alive idle timeout | `60` | No |
+| `SHUTDOWN_TIMEOUT_SECONDS` | Maximum graceful shutdown wait; never less than the SMTP timeout plus 5 seconds | `40` | No |
 
 `SMTP_USE_TLS` and `SMTP_USE_STARTTLS` are mutually exclusive. For implicit TLS, set `SMTP_USE_TLS=true` and `SMTP_USE_STARTTLS=false`.
 The effective HTTP write timeout is always at least `SMTP_TIMEOUT_SECONDS + 5` seconds so an SMTP operation can finish before the response deadline.
@@ -115,7 +118,8 @@ Keep `SMTP_SKIP_TLS_VERIFY=false` outside isolated development environments.
 
 - `/healthz` is a **liveness** endpoint. It confirms that the HTTP process can respond, but it does not check SMTP configuration, authentication, connectivity, or delivery.
 - `/readyz` is a **readiness** endpoint. It returns success only when the SMTP client was initialized from valid local configuration; it does not test SMTP network connectivity or delivery.
-- On `SIGINT` or `SIGTERM`, the server stops accepting new requests and waits up to 10 seconds for HTTP shutdown. Each SMTP operation is also bounded by `SMTP_TIMEOUT_SECONDS`.
+- On `SIGINT` or `SIGTERM`, the server stops accepting new requests and waits up to `SHUTDOWN_TIMEOUT_SECONDS` for HTTP shutdown. The effective timeout is never shorter than `SMTP_TIMEOUT_SECONDS + 5` seconds, allowing in-flight sends to finish.
+- Configure the container runtime or process supervisor to wait at least as long as the effective shutdown timeout before sending `SIGKILL`. The examples use 40 seconds for both settings; increase `--stop-timeout` or `stop_grace_period` whenever the effective shutdown timeout is higher.
 
 ## Replica and Idempotency Model
 

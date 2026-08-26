@@ -37,6 +37,7 @@ func TestRuntimeLimits(t *testing.T) {
 	oldReadTimeout := HTTPReadTimeoutSec
 	oldWriteTimeout := HTTPWriteTimeoutSec
 	oldIdleTimeout := HTTPIdleTimeoutSec
+	oldShutdownTimeout := ShutdownTimeoutSec
 	t.Cleanup(func() {
 		SMTPTimeoutSec = oldSMTPTimeout
 		SMTPMaxConcurrent = oldSMTPMaxConcurrent
@@ -45,6 +46,7 @@ func TestRuntimeLimits(t *testing.T) {
 		HTTPReadTimeoutSec = oldReadTimeout
 		HTTPWriteTimeoutSec = oldWriteTimeout
 		HTTPIdleTimeoutSec = oldIdleTimeout
+		ShutdownTimeoutSec = oldShutdownTimeout
 	})
 
 	SMTPTimeoutSec = 30
@@ -54,6 +56,7 @@ func TestRuntimeLimits(t *testing.T) {
 	HTTPReadTimeoutSec = 7
 	HTTPWriteTimeoutSec = 50
 	HTTPIdleTimeoutSec = 70
+	ShutdownTimeoutSec = 55
 
 	if got := SMTPMaxConcurrentSends(); got != 7 {
 		t.Errorf("SMTPMaxConcurrentSends() = %d, want 7", got)
@@ -74,6 +77,9 @@ func TestRuntimeLimits(t *testing.T) {
 	if got := HTTPIdleTimeout(); got != 70*time.Second {
 		t.Errorf("HTTPIdleTimeout() = %v, want 70s", got)
 	}
+	if got := ShutdownTimeout(); got != 55*time.Second {
+		t.Errorf("ShutdownTimeout() = %v, want 55s", got)
+	}
 }
 
 func TestRuntimeLimitsUseSafeFallbacks(t *testing.T) {
@@ -84,6 +90,7 @@ func TestRuntimeLimitsUseSafeFallbacks(t *testing.T) {
 	oldReadTimeout := HTTPReadTimeoutSec
 	oldWriteTimeout := HTTPWriteTimeoutSec
 	oldIdleTimeout := HTTPIdleTimeoutSec
+	oldShutdownTimeout := ShutdownTimeoutSec
 	t.Cleanup(func() {
 		SMTPTimeoutSec = oldSMTPTimeout
 		SMTPMaxConcurrent = oldSMTPMaxConcurrent
@@ -92,6 +99,7 @@ func TestRuntimeLimitsUseSafeFallbacks(t *testing.T) {
 		HTTPReadTimeoutSec = oldReadTimeout
 		HTTPWriteTimeoutSec = oldWriteTimeout
 		HTTPIdleTimeoutSec = oldIdleTimeout
+		ShutdownTimeoutSec = oldShutdownTimeout
 	})
 
 	SMTPTimeoutSec = 0
@@ -101,6 +109,7 @@ func TestRuntimeLimitsUseSafeFallbacks(t *testing.T) {
 	HTTPReadTimeoutSec = 0
 	HTTPWriteTimeoutSec = 1
 	HTTPIdleTimeoutSec = 0
+	ShutdownTimeoutSec = 1
 
 	if got := SMTPTimeout(); got != 30*time.Second {
 		t.Errorf("SMTPTimeout() = %v, want default 30s", got)
@@ -122,5 +131,8 @@ func TestRuntimeLimitsUseSafeFallbacks(t *testing.T) {
 	}
 	if got := HTTPIdleTimeout(); got != 60*time.Second {
 		t.Errorf("HTTPIdleTimeout() = %v, want default 60s", got)
+	}
+	if got := ShutdownTimeout(); got != 35*time.Second {
+		t.Errorf("ShutdownTimeout() = %v, want SMTP timeout plus 5s", got)
 	}
 }

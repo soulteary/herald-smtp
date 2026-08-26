@@ -27,6 +27,7 @@ var (
 	HTTPReadTimeoutSec  = env.GetInt("HTTP_READ_TIMEOUT_SECONDS", 10)
 	HTTPWriteTimeoutSec = env.GetInt("HTTP_WRITE_TIMEOUT_SECONDS", 40)
 	HTTPIdleTimeoutSec  = env.GetInt("HTTP_IDLE_TIMEOUT_SECONDS", 60)
+	ShutdownTimeoutSec  = env.GetInt("SHUTDOWN_TIMEOUT_SECONDS", 40)
 )
 
 const (
@@ -37,6 +38,7 @@ const (
 	defaultHTTPReadTimeoutSec  = 10
 	defaultHTTPWriteTimeoutSec = 40
 	defaultHTTPIdleTimeoutSec  = 60
+	defaultShutdownTimeoutSec  = 40
 )
 
 // Valid returns true when SMTP is configured (host, from required for send).
@@ -82,6 +84,16 @@ func HTTPWriteTimeout() time.Duration {
 // HTTPIdleTimeout limits idle keep-alive connections.
 func HTTPIdleTimeout() time.Duration {
 	return positiveDuration(HTTPIdleTimeoutSec, defaultHTTPIdleTimeoutSec)
+}
+
+// ShutdownTimeout allows in-flight SMTP sends to finish before the process exits.
+func ShutdownTimeout() time.Duration {
+	configured := positiveDuration(ShutdownTimeoutSec, defaultShutdownTimeoutSec)
+	minimum := SMTPTimeout() + 5*time.Second
+	if configured < minimum {
+		return minimum
+	}
+	return configured
 }
 
 func positiveInt(value, fallback int) int {
