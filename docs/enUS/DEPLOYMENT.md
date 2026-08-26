@@ -94,6 +94,7 @@ services:
 | `HTTP_READ_TIMEOUT_SECONDS` | HTTP request read timeout | `10` | No |
 | `HTTP_WRITE_TIMEOUT_SECONDS` | HTTP response write timeout | `40` | No |
 | `HTTP_IDLE_TIMEOUT_SECONDS` | HTTP keep-alive idle timeout | `60` | No |
+| `SHUTDOWN_TIMEOUT_SECONDS` | Maximum graceful shutdown wait; never less than the SMTP timeout plus 5 seconds | `40` | No |
 
 `SMTP_USE_TLS` and `SMTP_USE_STARTTLS` are mutually exclusive. For implicit TLS, set `SMTP_USE_TLS=true` and `SMTP_USE_STARTTLS=false`.
 The effective HTTP write timeout is always at least `SMTP_TIMEOUT_SECONDS + 5` seconds so an SMTP operation can finish before the response deadline.
@@ -114,7 +115,7 @@ Keep `SMTP_SKIP_TLS_VERIFY=false` outside isolated development environments.
 
 - `/healthz` is a **liveness** endpoint. It confirms that the HTTP process can respond, but it does not check SMTP configuration, authentication, connectivity, or delivery.
 - The project does not currently expose a separate readiness endpoint. For readiness, combine process health with a configuration check in the deployment platform, and monitor real send failures separately.
-- On `SIGINT` or `SIGTERM`, the server stops accepting new requests and waits up to 10 seconds for HTTP shutdown. Each SMTP operation is also bounded by `SMTP_TIMEOUT_SECONDS`.
+- On `SIGINT` or `SIGTERM`, the server stops accepting new requests and waits up to `SHUTDOWN_TIMEOUT_SECONDS` for HTTP shutdown. The effective timeout is never shorter than `SMTP_TIMEOUT_SECONDS + 5` seconds, allowing in-flight sends to finish.
 
 ## Replica and Idempotency Model
 

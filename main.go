@@ -59,7 +59,7 @@ func main() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 	log.Info().Msg("shutting down")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), config.ShutdownTimeout())
 	defer cancel()
 	if err := app.ShutdownWithContext(ctx); err != nil {
 		log.Warn().Err(err).Msg("shutdown error")

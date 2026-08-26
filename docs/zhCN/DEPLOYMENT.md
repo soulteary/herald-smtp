@@ -92,6 +92,7 @@ docker run -d --name herald-smtp -p 8084:8084 \
 | `HTTP_READ_TIMEOUT_SECONDS` | HTTP 请求读取超时 | `10` | 否 |
 | `HTTP_WRITE_TIMEOUT_SECONDS` | HTTP 响应写入超时 | `40` | 否 |
 | `HTTP_IDLE_TIMEOUT_SECONDS` | HTTP 长连接空闲超时 | `60` | 否 |
+| `SHUTDOWN_TIMEOUT_SECONDS` | 优雅关闭最长等待时间，实际值不会短于 SMTP 超时加 5 秒 | `40` | 否 |
 
 `SMTP_USE_TLS` 与 `SMTP_USE_STARTTLS` 不能同时启用。使用隐式 TLS 时，应设置 `SMTP_USE_TLS=true` 和 `SMTP_USE_STARTTLS=false`。
 实际 HTTP 写入超时始终不低于 `SMTP_TIMEOUT_SECONDS + 5` 秒，确保 SMTP 操作能在响应截止时间前完成。
@@ -112,7 +113,7 @@ docker run -d --name herald-smtp -p 8084:8084 \
 
 - `/healthz` 是**存活检查**，仅确认 HTTP 进程能够响应，不检查 SMTP 配置、认证、网络连通性或最终投递。
 - 项目目前没有独立的就绪检查端点。部署平台可将进程存活与配置检查组合使用，并单独监控真实发送失败。
-- 收到 `SIGINT` 或 `SIGTERM` 后，服务停止接收新请求，HTTP 关闭最多等待 10 秒；每次 SMTP 操作还受 `SMTP_TIMEOUT_SECONDS` 限制。
+- 收到 `SIGINT` 或 `SIGTERM` 后，服务停止接收新请求，并按 `SHUTDOWN_TIMEOUT_SECONDS` 等待 HTTP 关闭。实际关闭超时不会短于 `SMTP_TIMEOUT_SECONDS + 5` 秒，以便进行中的发送能够完成。
 
 ## 副本与幂等模型
 
