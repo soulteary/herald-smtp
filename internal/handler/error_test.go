@@ -35,14 +35,13 @@ func TestFrameworkErrorHandlerReturnsJSON(t *testing.T) {
 	}
 }
 
-func TestFrameworkErrorHandlerMapsBodyLimit(t *testing.T) {
-	app := fiber.New(fiber.Config{BodyLimit: 8, ErrorHandler: FrameworkErrorHandler})
+func TestFrameworkErrorHandlerMapsRequestEntityTooLarge(t *testing.T) {
+	app := fiber.New(fiber.Config{ErrorHandler: FrameworkErrorHandler})
 	app.Post("/body", func(c fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusNoContent)
+		return fiber.ErrRequestEntityTooLarge
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/body", strings.NewReader("payload-too-large"))
-	req.Header.Set("Content-Type", "text/plain")
+	req := httptest.NewRequest(http.MethodPost, "/body", http.NoBody)
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
 	if err != nil {
 		t.Fatal(err)
