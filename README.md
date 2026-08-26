@@ -49,6 +49,7 @@ sequenceDiagram
   Request: `channel` (e.g. `email`), `to` (email address), `subject`, `body` (or `params.code`), `idempotency_key`, optional `template`/`params`/`locale`.  
   Response: `{ "ok": true, "message_id": "...", "provider": "smtp" }` or `{ "ok": false, "error_code": "...", "error_message": "..." }`.
 - **GET /healthz**: Liveness endpoint returning `{ "status": "healthy", "service": "herald-smtp" }`. It does not test SMTP configuration or connectivity.
+- **GET /readyz**: Readiness endpoint. It returns `200` after the SMTP client is initialized and `503` when SMTP configuration is missing or invalid.
 
 ## Essential Configuration
 

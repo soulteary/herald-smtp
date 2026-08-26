@@ -49,6 +49,7 @@ sequenceDiagram
   请求：`channel`（如 `email`）、`to`（邮箱地址）、`subject`、`body`（或 `params.code`）、`idempotency_key`，可选 `template`/`params`/`locale`。  
   响应：`{ "ok": true, "message_id": "...", "provider": "smtp" }` 或 `{ "ok": false, "error_code": "...", "error_message": "..." }`。
 - **GET /healthz**：存活检查端点，返回 `{ "status": "healthy", "service": "herald-smtp" }`；不会检查 SMTP 配置或连通性。
+- **GET /readyz**：就绪检查端点。SMTP Client 初始化成功时返回 `200`，SMTP 配置缺失或无效时返回 `503`。
 
 ## 基础配置
 

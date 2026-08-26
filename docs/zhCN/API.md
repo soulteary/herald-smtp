@@ -30,6 +30,12 @@ http://localhost:8084
 }
 ```
 
+### 就绪检查
+
+**GET /readyz**
+
+SMTP Client 初始化成功时返回 HTTP `200` 和 `status: ready`；SMTP 配置缺失或无效时返回 HTTP `503` 和 `status: not_ready`。该检查只验证本地初始化状态，不会连接 SMTP 服务器，也不代表邮件最终投递成功。
+
 ### 发送（SMTP 邮件）
 
 **POST /v1/send**
