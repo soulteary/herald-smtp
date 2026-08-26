@@ -48,4 +48,17 @@ func setupWith(app *fiber.App, log *logger.Logger, inject sendClient) {
 		return handler.SendHandler(c, smtpClient, idemStore, log)
 	})
 	app.Get("/healthz", health.SimpleFiberHandler("herald-smtp"))
+	app.Get("/readyz", func(c fiber.Ctx) error {
+		if smtpClient == nil {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+				"status":  "not_ready",
+				"service": "herald-smtp",
+				"reason":  "smtp_not_configured",
+			})
+		}
+		return c.JSON(fiber.Map{
+			"status":  "ready",
+			"service": "herald-smtp",
+		})
+	})
 }

@@ -19,7 +19,7 @@ go build -o herald-smtp .
 docker build -t herald-smtp .
 
 # 运行并传入环境变量
-docker run -d --name herald-smtp -p 8084:8084 \
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   --health-cmd='curl -fsS http://localhost:8084/healthz || exit 1' \
   --health-interval=30s --health-timeout=3s \
   -e SMTP_HOST=smtp.example.com \
@@ -36,6 +36,7 @@ services:
   herald-smtp:
     image: herald-smtp:latest
     build: .
+    stop_grace_period: 40s
     ports:
       - "8084:8084"
     environment:
@@ -48,6 +49,7 @@ services:
       # - API_KEY=${API_KEY}
       # - LOG_LEVEL=info
       # - IDEMPOTENCY_TTL_SECONDS=300
+      # - SHUTDOWN_TIMEOUT_SECONDS=40
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8084/healthz"]
       interval: 30s
@@ -58,7 +60,7 @@ services:
 可选：若在 herald-smtp 上配置了 `API_KEY`，传入该值并在 Herald 侧将 `HERALD_SMTP_API_KEY` 设为相同值：
 
 ```bash
-docker run -d --name herald-smtp -p 8084:8084 \
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e API_KEY=your_shared_secret \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
@@ -85,6 +87,7 @@ docker run -d --name herald-smtp -p 8084:8084 \
 | `SMTP_USE_STARTTLS` | 使用 STARTTLS | `true` | 否 |
 | `SMTP_SKIP_TLS_VERIFY` | 跳过证书校验，仅限开发环境 | `false` | 否 |
 | `SMTP_TIMEOUT_SECONDS` | SMTP 完整发送过程的超时时间 | `30` | 否 |
+| `SMTP_MAX_CONCURRENT_SENDS` | 同时进行的 SMTP 发送数量上限 | `16` | 否 |
 | `LOG_LEVEL` | 日志级别：trace, debug, info, warn, error | `info` | 否 |
 | `IDEMPOTENCY_TTL_SECONDS` | 幂等缓存 TTL（秒） | `300` | 否 |
 | `IDEMPOTENCY_MAX_ENTRIES` | 处理中及已缓存幂等键的最大总数 | `10000` | 否 |
@@ -112,8 +115,9 @@ docker run -d --name herald-smtp -p 8084:8084 \
 ## 健康检查与关闭
 
 - `/healthz` 是**存活检查**，仅确认 HTTP 进程能够响应，不检查 SMTP 配置、认证、网络连通性或最终投递。
-- 项目目前没有独立的就绪检查端点。部署平台可将进程存活与配置检查组合使用，并单独监控真实发送失败。
+- `/readyz` 是**就绪检查**，仅在 SMTP Client 已根据有效本地配置完成初始化时返回成功；它不会测试 SMTP 网络连通性或最终投递。
 - 收到 `SIGINT` 或 `SIGTERM` 后，服务停止接收新请求，并按 `SHUTDOWN_TIMEOUT_SECONDS` 等待 HTTP 关闭。实际关闭超时不会短于 `SMTP_TIMEOUT_SECONDS + 5` 秒，以便进行中的发送能够完成。
+- 容器运行时或进程管理器在发送 `SIGKILL` 前的等待时间必须不少于实际关闭超时。示例将两者都设为 40 秒；若实际关闭超时更长，应同步增大 `--stop-timeout` 或 `stop_grace_period`。
 
 ## 副本与幂等模型
 

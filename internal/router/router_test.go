@@ -41,6 +41,46 @@ func TestRouter_Healthz(t *testing.T) {
 	}
 }
 
+func TestRouter_ReadyzNotReadyWithoutSMTPClient(t *testing.T) {
+	if config.Valid() {
+		t.Skip("SMTP configured in env; cannot test not-ready path")
+	}
+	app := fiber.New()
+	log := logger.New(logger.Config{Level: logger.InfoLevel, ServiceName: "test"})
+	Setup(app, log)
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("GET /readyz status = %d, want 503", resp.StatusCode)
+	}
+}
+
+func TestRouter_ReadyzWithSMTPClient(t *testing.T) {
+	app := fiber.New()
+	log := logger.New(logger.Config{Level: logger.InfoLevel, ServiceName: "test"})
+	setupWith(app, log, &mockSendClient{})
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("GET /readyz status = %d, want 200", resp.StatusCode)
+	}
+	var out map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out["status"] != "ready" {
+		t.Errorf("GET /readyz status field = %q, want ready", out["status"])
+	}
+}
+
 // TestRouter_Send_503WhenNotConfigured: when no client (nil inject and config invalid), POST /v1/send returns 503.
 func TestRouter_Send_503WhenNotConfigured(t *testing.T) {
 	if config.Valid() {

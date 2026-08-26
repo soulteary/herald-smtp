@@ -10,6 +10,7 @@ import (
 // Client wraps provider-kit SMTP provider for sending email via HTTP /v1/send.
 type Client struct {
 	provider provider.Provider
+	slots    chan struct{}
 }
 
 // NewClient creates a client from config. Returns nil if config is invalid.
@@ -36,7 +37,10 @@ func NewClient() (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{provider: p}, nil
+	return &Client{
+		provider: p,
+		slots:    make(chan struct{}, config.SMTPMaxConcurrentSends()),
+	}, nil
 }
 
 // Send sends an email using provider-kit Message; returns provider-kit SendResult and error.
@@ -45,6 +49,16 @@ func (c *Client) Send(ctx context.Context, msg *provider.Message) (*provider.Sen
 		err := provider.ErrProviderDown("SMTP client is not initialized", nil).
 			WithProvider("smtp", provider.ChannelEmail)
 		return provider.NewFailureResult("smtp", provider.ChannelEmail, err), err
+	}
+	if c.slots != nil {
+		select {
+		case c.slots <- struct{}{}:
+			defer func() { <-c.slots }()
+		default:
+			err := provider.ErrRateLimited("maximum concurrent SMTP sends reached").
+				WithProvider("smtp", provider.ChannelEmail)
+			return provider.NewFailureResult("smtp", provider.ChannelEmail, err), err
+		}
 	}
 	return c.provider.Send(ctx, msg)
 }

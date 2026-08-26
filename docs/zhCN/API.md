@@ -30,6 +30,12 @@ http://localhost:8084
 }
 ```
 
+### 就绪检查
+
+**GET /readyz**
+
+SMTP Client 初始化成功时返回 HTTP `200` 和 `status: ready`；SMTP 配置缺失或无效时返回 HTTP `503` 和 `status: not_ready`。该检查只验证本地初始化状态，不会连接 SMTP 服务器，也不代表邮件最终投递成功。
+
 ### 发送（SMTP 邮件）
 
 **POST /v1/send**
@@ -105,7 +111,7 @@ curl -sS -X POST http://localhost:8084/v1/send \
 | `timeout` | 504 | SMTP 发送超过截止时间。 |
 | `send_failed` | 500 | SMTP 发送错误（连接、认证或服务器错误）。 |
 
-超过 `HTTP_BODY_LIMIT_BYTES` 的请求体会在 JSON 解析前由 HTTP 服务器以 `413` 状态拒绝。
+超过 `HTTP_BODY_LIMIT_BYTES` 的请求体会在 JSON 解析前由 HTTP 服务器以 `413` 状态拒绝。经由 Fiber Handler 返回的路由不存在、方法不支持和请求实体过大等错误使用与 `/v1/send` 相同的 JSON 响应结构。Fasthttp 的底层请求体限制可能在进入 Fiber Handler 前直接拒绝请求。
 
 ## 幂等
 

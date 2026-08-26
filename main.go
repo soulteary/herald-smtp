@@ -12,6 +12,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 	"github.com/soulteary/herald-smtp/internal/config"
+	"github.com/soulteary/herald-smtp/internal/handler"
 	"github.com/soulteary/herald-smtp/internal/router"
 	"github.com/soulteary/logger-kit/v2"
 	version "github.com/soulteary/version-kit/v2"
@@ -72,5 +73,6 @@ func newApp() *fiber.App {
 		ReadTimeout:  config.HTTPReadTimeout(),
 		WriteTimeout: config.HTTPWriteTimeout(),
 		IdleTimeout:  config.HTTPIdleTimeout(),
+		ErrorHandler: handler.FrameworkErrorHandler,
 	})
 }

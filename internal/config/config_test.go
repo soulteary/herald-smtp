@@ -31,6 +31,7 @@ func TestSMTPTimeout(t *testing.T) {
 
 func TestRuntimeLimits(t *testing.T) {
 	oldSMTPTimeout := SMTPTimeoutSec
+	oldSMTPMaxConcurrent := SMTPMaxConcurrent
 	oldMaxEntries := IdemMaxEntries
 	oldBodyLimit := HTTPBodyLimitBytes
 	oldReadTimeout := HTTPReadTimeoutSec
@@ -39,6 +40,7 @@ func TestRuntimeLimits(t *testing.T) {
 	oldShutdownTimeout := ShutdownTimeoutSec
 	t.Cleanup(func() {
 		SMTPTimeoutSec = oldSMTPTimeout
+		SMTPMaxConcurrent = oldSMTPMaxConcurrent
 		IdemMaxEntries = oldMaxEntries
 		HTTPBodyLimitBytes = oldBodyLimit
 		HTTPReadTimeoutSec = oldReadTimeout
@@ -48,12 +50,17 @@ func TestRuntimeLimits(t *testing.T) {
 	})
 
 	SMTPTimeoutSec = 30
+	SMTPMaxConcurrent = 7
 	IdemMaxEntries = 123
 	HTTPBodyLimitBytes = 4096
 	HTTPReadTimeoutSec = 7
 	HTTPWriteTimeoutSec = 50
 	HTTPIdleTimeoutSec = 70
 	ShutdownTimeoutSec = 55
+
+	if got := SMTPMaxConcurrentSends(); got != 7 {
+		t.Errorf("SMTPMaxConcurrentSends() = %d, want 7", got)
+	}
 
 	if got := IdempotencyMaxEntries(); got != 123 {
 		t.Errorf("IdempotencyMaxEntries() = %d, want 123", got)
@@ -77,6 +84,7 @@ func TestRuntimeLimits(t *testing.T) {
 
 func TestRuntimeLimitsUseSafeFallbacks(t *testing.T) {
 	oldSMTPTimeout := SMTPTimeoutSec
+	oldSMTPMaxConcurrent := SMTPMaxConcurrent
 	oldMaxEntries := IdemMaxEntries
 	oldBodyLimit := HTTPBodyLimitBytes
 	oldReadTimeout := HTTPReadTimeoutSec
@@ -85,6 +93,7 @@ func TestRuntimeLimitsUseSafeFallbacks(t *testing.T) {
 	oldShutdownTimeout := ShutdownTimeoutSec
 	t.Cleanup(func() {
 		SMTPTimeoutSec = oldSMTPTimeout
+		SMTPMaxConcurrent = oldSMTPMaxConcurrent
 		IdemMaxEntries = oldMaxEntries
 		HTTPBodyLimitBytes = oldBodyLimit
 		HTTPReadTimeoutSec = oldReadTimeout
@@ -94,6 +103,7 @@ func TestRuntimeLimitsUseSafeFallbacks(t *testing.T) {
 	})
 
 	SMTPTimeoutSec = 0
+	SMTPMaxConcurrent = 0
 	IdemMaxEntries = 0
 	HTTPBodyLimitBytes = -1
 	HTTPReadTimeoutSec = 0
@@ -103,6 +113,9 @@ func TestRuntimeLimitsUseSafeFallbacks(t *testing.T) {
 
 	if got := SMTPTimeout(); got != 30*time.Second {
 		t.Errorf("SMTPTimeout() = %v, want default 30s", got)
+	}
+	if got := SMTPMaxConcurrentSends(); got != 16 {
+		t.Errorf("SMTPMaxConcurrentSends() = %d, want default 16", got)
 	}
 	if got := IdempotencyMaxEntries(); got != 10000 {
 		t.Errorf("IdempotencyMaxEntries() = %d, want default 10000", got)

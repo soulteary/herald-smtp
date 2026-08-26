@@ -17,12 +17,14 @@ func setTestConfig(t *testing.T) {
 	oldFrom, oldFromName := config.SMTPFrom, config.SMTPFromName
 	oldTLS, oldStartTLS := config.UseTLS, config.UseStartTLS
 	oldSkipVerify, oldTimeout := config.SkipTLSVerify, config.SMTPTimeoutSec
+	oldMaxConcurrent := config.SMTPMaxConcurrent
 	t.Cleanup(func() {
 		config.SMTPHost, config.SMTPPort = oldHost, oldPort
 		config.SMTPUser, config.SMTPPass = oldUser, oldPass
 		config.SMTPFrom, config.SMTPFromName = oldFrom, oldFromName
 		config.UseTLS, config.UseStartTLS = oldTLS, oldStartTLS
 		config.SkipTLSVerify, config.SMTPTimeoutSec = oldSkipVerify, oldTimeout
+		config.SMTPMaxConcurrent = oldMaxConcurrent
 	})
 	config.SMTPHost = "localhost"
 	config.SMTPPort = 25
@@ -34,6 +36,34 @@ func setTestConfig(t *testing.T) {
 	config.UseStartTLS = false
 	config.SkipTLSVerify = false
 	config.SMTPTimeoutSec = int((5 * time.Second) / time.Second)
+	config.SMTPMaxConcurrent = 16
+}
+
+type blockingProvider struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (p *blockingProvider) Send(ctx context.Context, _ *provider.Message) (*provider.SendResult, error) {
+	close(p.started)
+	select {
+	case <-p.release:
+		return provider.NewSuccessResult("smtp", provider.ChannelEmail, "sent"), nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (p *blockingProvider) Channel() provider.Channel {
+	return provider.ChannelEmail
+}
+
+func (p *blockingProvider) Name() string {
+	return "smtp"
+}
+
+func (p *blockingProvider) Validate() error {
+	return nil
 }
 
 func TestNewClient_InvalidConfig(t *testing.T) {
@@ -148,5 +178,30 @@ func TestClient_SendRejectsUnsafeMessageBeforeDial(t *testing.T) {
 				t.Errorf("Send() error = %v, want result error", sendErr)
 			}
 		})
+	}
+}
+
+func TestClient_SendRejectsWhenConcurrencyLimitReached(t *testing.T) {
+	backend := &blockingProvider{started: make(chan struct{}), release: make(chan struct{})}
+	client := &Client{provider: backend, slots: make(chan struct{}, 1)}
+	firstDone := make(chan error, 1)
+
+	go func() {
+		_, err := client.Send(context.Background(), provider.NewMessage("first@example.com").WithBody("body"))
+		firstDone <- err
+	}()
+	<-backend.started
+
+	result, err := client.Send(context.Background(), provider.NewMessage("second@example.com").WithBody("body"))
+	if err == nil {
+		t.Fatal("second Send() error = nil, want rate_limited")
+	}
+	if result == nil || result.Error == nil || result.Error.Reason != provider.ReasonRateLimited {
+		t.Fatalf("second Send() result = %#v, want rate_limited", result)
+	}
+
+	close(backend.release)
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first Send() error = %v", err)
 	}
 }

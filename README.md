@@ -10,7 +10,7 @@
 
 SMTP email adapter for [Herald](https://github.com/soulteary/herald). Herald forwards verification codes over HTTP to this service; herald-smtp sends email via SMTP. All SMTP credentials and sending logic live in this project only—Herald does not hold any SMTP credentials when using herald-smtp.
 
-The HTTP server uses Fiber v3.4.0 and the matching v2 module lines of the Fiber-facing kit packages. Building from source requires Go 1.26 or later.
+The HTTP server uses Fiber v3 and the matching v2 module lines of the Fiber-facing kit packages. Building from source requires Go 1.26 or later.
 
 ## Core Features
 
@@ -49,6 +49,7 @@ sequenceDiagram
   Request: `channel` (e.g. `email`), `to` (email address), `subject`, `body` (or `params.code`), `idempotency_key`, optional `template`/`params`/`locale`.  
   Response: `{ "ok": true, "message_id": "...", "provider": "smtp" }` or `{ "ok": false, "error_code": "...", "error_message": "..." }`.
 - **GET /healthz**: Liveness endpoint returning `{ "status": "healthy", "service": "herald-smtp" }`. It does not test SMTP configuration or connectivity.
+- **GET /readyz**: Readiness endpoint. It returns `200` after the SMTP client is initialized and `503` when SMTP configuration is missing or invalid.
 
 ## Essential Configuration
 
@@ -135,4 +136,4 @@ go test -race -cover ./...
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+See [LICENSE](LICENSE) for details. Notable release changes are recorded in [CHANGELOG.md](CHANGELOG.md).
