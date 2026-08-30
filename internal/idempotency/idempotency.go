@@ -28,6 +28,7 @@ type Store struct {
 	maxEntries      int
 	cleanupInterval time.Duration
 	nextCleanup     time.Time
+	earliestExpiry  time.Time
 }
 
 // NewStore creates a store with the given TTL in seconds and entry limit.
@@ -74,7 +75,8 @@ func (s *Store) Begin(ctx context.Context, key, fingerprint string) (cached, Dec
 		s.cleanupExpired(now)
 		e, ok := s.m[key]
 		if !ok {
-			if len(s.m) >= s.maxEntries {
+			if len(s.m) >= s.maxEntries &&
+				!s.earliestExpiry.IsZero() && !now.Before(s.earliestExpiry) {
 				s.removeExpired(now)
 			}
 			if len(s.m) >= s.maxEntries {
@@ -130,6 +132,9 @@ func (s *Store) Finish(key, fingerprint string, ok bool, messageID string) {
 	e.messageID = messageID
 	e.expiresAt = time.Now().Add(time.Duration(s.ttlSec) * time.Second)
 	s.m[key] = e
+	if s.earliestExpiry.IsZero() || e.expiresAt.Before(s.earliestExpiry) {
+		s.earliestExpiry = e.expiresAt
+	}
 	close(e.ready)
 }
 
@@ -137,14 +142,23 @@ func (s *Store) cleanupExpired(now time.Time) {
 	if now.Before(s.nextCleanup) {
 		return
 	}
-	s.removeExpired(now)
 	s.nextCleanup = now.Add(s.cleanupInterval)
+	if s.earliestExpiry.IsZero() || now.Before(s.earliestExpiry) {
+		return
+	}
+	s.removeExpired(now)
 }
 
 func (s *Store) removeExpired(now time.Time) {
+	s.earliestExpiry = time.Time{}
 	for storedKey, storedEntry := range s.m {
-		if storedEntry.complete && now.After(storedEntry.expiresAt) {
+		if storedEntry.complete && !now.Before(storedEntry.expiresAt) {
 			delete(s.m, storedKey)
+			continue
+		}
+		if storedEntry.complete &&
+			(s.earliestExpiry.IsZero() || storedEntry.expiresAt.Before(s.earliestExpiry)) {
+			s.earliestExpiry = storedEntry.expiresAt
 		}
 	}
 }
