@@ -59,6 +59,27 @@ func TestStore_CapacityBoundsNewKeys(t *testing.T) {
 	}
 }
 
+func TestStore_CapacityTracksNextPossibleExpiry(t *testing.T) {
+	store := NewStore(300, 1)
+	if _, decision, err := store.Begin(context.Background(), "first", "request-1"); err != nil || decision != Proceed {
+		t.Fatalf("first Begin() = (%v, %v), want Proceed", decision, err)
+	}
+	store.Finish("first", "request-1", true, "msg-1")
+	tracked := store.earliestExpiry
+	if tracked.IsZero() || !tracked.Equal(store.m["first"].expiresAt) {
+		t.Fatalf("earliest expiry = %v, want %v", tracked, store.m["first"].expiresAt)
+	}
+
+	for i := 0; i < 3; i++ {
+		if _, _, err := store.Begin(context.Background(), "other", "request-2"); !errors.Is(err, ErrCapacityExceeded) {
+			t.Fatalf("full-store Begin() error = %v, want capacity error", err)
+		}
+		if !store.earliestExpiry.Equal(tracked) {
+			t.Fatalf("unexpired capacity check changed earliest expiry: got %v, want %v", store.earliestExpiry, tracked)
+		}
+	}
+}
+
 func TestStore_FailedReservationFreesCapacity(t *testing.T) {
 	store := NewStore(300, 1)
 	if _, decision, err := store.Begin(context.Background(), "first", "request-1"); err != nil || decision != Proceed {
@@ -80,6 +101,7 @@ func TestStore_ExpiredResultFreesCapacityImmediately(t *testing.T) {
 	entry := store.m["first"]
 	entry.expiresAt = time.Now().Add(-time.Second)
 	store.m["first"] = entry
+	store.earliestExpiry = entry.expiresAt
 	store.nextCleanup = time.Now().Add(time.Minute)
 
 	if _, decision, err := store.Begin(context.Background(), "second", "request-2"); err != nil || decision != Proceed {
@@ -164,6 +186,7 @@ func TestStore_ExpiredEntryCanBeReused(t *testing.T) {
 func TestStore_BeginCleansExpiredEntries(t *testing.T) {
 	store := NewStore(300, 10000)
 	store.m["expired"] = entry{complete: true, expiresAt: time.Now().Add(-time.Second)}
+	store.earliestExpiry = store.m["expired"].expiresAt
 	store.nextCleanup = time.Time{}
 	if _, decision, err := store.Begin(context.Background(), "new", "request"); err != nil || decision != Proceed {
 		t.Fatalf("Begin() decision = %v, error = %v", decision, err)
