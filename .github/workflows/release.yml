@@ -52,8 +52,11 @@ jobs:
           TAG=${GITHUB_REF#refs/tags/}
           COMMIT=${GITHUB_SHA}
           BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          # Build metadata is not part of SemVer precedence and may contain '-'.
+          # Strip it before deciding whether a prerelease identifier is present.
+          VERSION_WITHOUT_BUILD="${TAG%%+*}"
           PRERELEASE=false
-          if [[ "${TAG}" == *-* ]]; then
+          if [[ "${VERSION_WITHOUT_BUILD}" == *-* ]]; then
             PRERELEASE=true
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
