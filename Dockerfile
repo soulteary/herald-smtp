@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.27.0-alpine3.23 AS builder
+FROM golang:1.27.1-alpine3.24 AS builder
 RUN apk add --no-cache git
 WORKDIR /app
 ENV CGO_ENABLED=0 GOOS=linux
@@ -15,10 +15,11 @@ RUN BUILD_DATE=${BUILD_DATE:-$(date +%FT%T%z)} && \
     go build -ldflags "-w -s -X 'github.com/soulteary/version-kit/v2.Version=$VERSION' -X 'github.com/soulteary/version-kit/v2.Commit=$COMMIT' -X 'github.com/soulteary/version-kit/v2.BuildDate=$BUILD_DATE'" -o herald-smtp .
 
 # Runtime stage
-FROM alpine:3.23
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates curl
 COPY --from=builder /app/herald-smtp /bin/herald-smtp
-RUN addgroup -S herald && adduser -S -G herald herald
-USER herald
+RUN addgroup -g 10001 -S herald && \
+    adduser -u 10001 -S -D -G herald -H -s /sbin/nologin herald
+USER 10001:10001
 EXPOSE 8084
 CMD ["herald-smtp"]

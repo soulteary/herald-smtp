@@ -148,7 +148,7 @@ jobs:
         run: go mod download
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Run security scan
         run: govulncheck ./...
@@ -189,6 +189,9 @@ jobs:
         run: |
           docker images herald-smtp:test
           docker inspect herald-smtp:test
+
+      - name: Assert image runs as fixed non-root user
+        run: test "$(docker inspect --format '{{.Config.User}}' herald-smtp:test)" = "10001:10001"
 
   # Full build check
   build:
