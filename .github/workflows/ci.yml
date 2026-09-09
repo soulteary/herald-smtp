@@ -190,6 +190,9 @@ jobs:
           docker images herald-smtp:test
           docker inspect herald-smtp:test
 
+      - name: Assert image runs as fixed non-root user
+        run: test "$(docker inspect --format '{{.Config.User}}' herald-smtp:test)" = "10001:10001"
+
   # Full build check
   build:
     name: Build Check
