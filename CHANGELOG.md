@@ -5,6 +5,8 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-09-21
+
 ### Changed
 
 - Upgrade health-kit to v4.0.0, logger-kit to v3.0.0, and version-kit to v4.0.0, adopting each kit's new major module path.
@@ -62,6 +64,7 @@ Version 1 establishes the documented HTTP, configuration, and operational behavi
 
 - Clarify authentication, TLS modes, health checks, idempotency scope, and multi-replica limitations.
 
-[Unreleased]: https://github.com/soulteary/herald-smtp/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/soulteary/herald-smtp/compare/v1.2.3...HEAD
+[1.2.3]: https://github.com/soulteary/herald-smtp/compare/v1.2.2...v1.2.3
 [1.0.0]: https://github.com/soulteary/herald-smtp/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/soulteary/herald-smtp/releases/tag/v0.6.0
