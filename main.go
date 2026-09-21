@@ -14,8 +14,8 @@ import (
 	"github.com/soulteary/herald-smtp/internal/config"
 	"github.com/soulteary/herald-smtp/internal/handler"
 	"github.com/soulteary/herald-smtp/internal/router"
-	"github.com/soulteary/logger-kit/v2"
-	version "github.com/soulteary/version-kit/v2"
+	"github.com/soulteary/logger-kit/v3"
+	version "github.com/soulteary/version-kit/v4"
 )
 
 // showBanner displays the startup banner with version

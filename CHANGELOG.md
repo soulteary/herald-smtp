@@ -5,6 +5,14 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ## [Unreleased]
 
+### Changed
+
+- Upgrade health-kit to v4.0.0, logger-kit to v3.0.0, and version-kit to v4.0.0, adopting each kit's new major module path.
+- Serve `/healthz` through health-kit's `fiberadapter.SimpleHandler`, which replaces the Fiber handlers the root package no longer exports. The endpoint's status, headers, and response body are unchanged.
+- Point the version-kit linker paths in the CI, release, and Docker builds at the v4 module path. A stale path is not a build error; it leaves the binary reporting `dev`.
+- Drop the Redis, xxhash, and `go.uber.org/atomic` transitive dependencies, which health-kit v4 moved out of its root package into the `redisprobe` subpackage.
+- Refresh the transitive gofiber/schema, gofiber/utils, and go-brrr requirements that the upgraded kits raise.
+
 ## [1.0.0] - 2026-08-26
 
 Version 1 establishes the documented HTTP, configuration, and operational behavior as the stable compatibility baseline.

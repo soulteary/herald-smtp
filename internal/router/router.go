@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/soulteary/health-kit/v2"
+	healthfiber "github.com/soulteary/health-kit/v4/fiberadapter"
 	"github.com/soulteary/herald-smtp/internal/config"
 	"github.com/soulteary/herald-smtp/internal/handler"
 	"github.com/soulteary/herald-smtp/internal/idempotency"
 	"github.com/soulteary/herald-smtp/internal/smtp"
-	"github.com/soulteary/logger-kit/v2"
+	"github.com/soulteary/logger-kit/v3"
 	"github.com/soulteary/provider-kit"
 )
 
@@ -47,7 +47,7 @@ func setupWith(app *fiber.App, log *logger.Logger, inject sendClient) {
 		}
 		return handler.SendHandler(c, smtpClient, idemStore, log)
 	})
-	app.Get("/healthz", health.SimpleFiberHandler("herald-smtp"))
+	app.Get("/healthz", healthfiber.SimpleHandler("herald-smtp"))
 	app.Get("/readyz", func(c fiber.Ctx) error {
 		if smtpClient == nil {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
