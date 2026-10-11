@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "tests": {
+    "total": 58,
+    "passed": 58,
+    "failed": 0,
+    "skipped": 0
+  },
+  "coverage": {
+    "covered_statements": 242,
+    "total_statements": 286,
+    "percentage": 84.62,
+    "threshold": 0
+  },
+  "packages": [
+    {
+      "name": ".",
+      "status": "pass",
+      "tests": 1,
+      "failed": 0,
+      "coverage": 4.17
+    },
+    {
+      "name": "internal/config",
+      "status": "pass",
+      "tests": 5,
+      "failed": 0,
+      "coverage": 100
+    },
+    {
+      "name": "internal/handler",
+      "status": "pass",
+      "tests": 23,
+      "failed": 0,
+      "coverage": 89.39
+    },
+    {
+      "name": "internal/idempotency",
+      "status": "pass",
+      "tests": 13,
+      "failed": 0,
+      "coverage": 95.65
+    },
+    {
+      "name": "internal/router",
+      "status": "pass",
+      "tests": 5,
+      "failed": 0,
+      "coverage": 80.95
+    },
+    {
+      "name": "internal/smtp",
+      "status": "pass",
+      "tests": 11,
+      "failed": 0,
+      "coverage": 100
+    }
+  ],
+  "failures": null
+}
