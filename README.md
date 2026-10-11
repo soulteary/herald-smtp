@@ -1,7 +1,7 @@
 # herald-smtp
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/go-1.26+-blue.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/go-1.27.2+-blue.svg)](https://golang.org)
 [![Go Report Card](.github/goreportcard.svg)](.github/goreportcard-report.md)
 
 ## Multi-language Documentation
@@ -10,7 +10,7 @@
 
 SMTP email adapter for [Herald](https://github.com/soulteary/herald). Herald forwards verification codes over HTTP to this service; herald-smtp sends email via SMTP. All SMTP credentials and sending logic live in this project only—Herald does not hold any SMTP credentials when using herald-smtp.
 
-The HTTP server uses Fiber v3 and the matching v2 module lines of the Fiber-facing kit packages. Building from source requires Go 1.26 or later.
+The HTTP server uses Fiber v3 and the matching v2 module lines of the Fiber-facing kit packages. Building from source requires Go 1.27.2 or later.
 
 ## Core Features
 
