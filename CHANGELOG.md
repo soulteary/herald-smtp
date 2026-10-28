@@ -5,6 +5,11 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ## [Unreleased]
 
+### Changed
+
+- Upgrade `health-kit/v4` from v4.0.2 to v4.0.4; refresh the required Fiber/network
+  dependency graph and module checksums.
+
 ## [1.2.5] - 2026-10-22
 
 ### Changed
