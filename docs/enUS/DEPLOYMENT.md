@@ -16,7 +16,7 @@ go build -o herald-smtp .
 
 ```bash
 # Pull a fixed release
-docker pull ghcr.io/soulteary/herald-smtp:v1.0.0
+docker pull ghcr.io/soulteary/herald-smtp:v1.2.6
 
 # Run with env vars
 docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
@@ -26,7 +26,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.0.0
+  ghcr.io/soulteary/herald-smtp:v1.2.6
 ```
 
 To build the current source instead, run `docker build -t herald-smtp:local .` and substitute `herald-smtp:local` for the image name. Use a fixed release tag in production rather than `latest`.
@@ -40,7 +40,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.0.0
+  ghcr.io/soulteary/herald-smtp:v1.2.6
 ```
 
 ### Docker Compose (example)
@@ -50,7 +50,7 @@ Minimal example for herald-smtp only:
 ```yaml
 services:
   herald-smtp:
-    image: ghcr.io/soulteary/herald-smtp:v1.0.0
+    image: ghcr.io/soulteary/herald-smtp:v1.2.6
     stop_grace_period: 40s
     ports:
       - "8084:8084"

@@ -117,13 +117,13 @@ Replace the example host, credentials, sender, recipient, and API key before use
 ### Run with Docker
 
 ```bash
-docker pull ghcr.io/soulteary/herald-smtp:v1.0.0
+docker pull ghcr.io/soulteary/herald-smtp:v1.2.6
 docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.0.0
+  ghcr.io/soulteary/herald-smtp:v1.2.6
 ```
 
 Optional: add `-e API_KEY=your_shared_secret` and set `HERALD_SMTP_API_KEY` to the same value on Herald.
