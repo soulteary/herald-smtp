@@ -47,7 +47,7 @@
 ### 入门
 
 1. 阅读 [README.md](../../README.md) 了解项目
-2. 查看 [快速开始](../../README.md#快速开始)
+2. 查看 [快速开始](../../README.zhCN.md#快速开始)
 3. 参考 [DEPLOYMENT.md](DEPLOYMENT.md) 进行配置与 Herald 集成
 
 ### 开发

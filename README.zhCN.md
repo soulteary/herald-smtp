@@ -117,13 +117,13 @@ curl -sS -X POST http://localhost:8084/v1/send \
 ### 使用 Docker 运行
 
 ```bash
-docker pull ghcr.io/soulteary/herald-smtp:v1.0.0
+docker pull ghcr.io/soulteary/herald-smtp:v1.2.6
 docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.0.0
+  ghcr.io/soulteary/herald-smtp:v1.2.6
 ```
 
 可选：增加 `-e API_KEY=your_shared_secret`，并在 Herald 侧将 `HERALD_SMTP_API_KEY` 设为相同值。
