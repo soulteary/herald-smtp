@@ -30,5 +30,5 @@ Open an [Issue](https://github.com/soulteary/herald-smtp/issues) for questions o
 
 Run `go test -race -count=1 -coverprofile=coverage.out ./...` and
 `go tool cover -func=coverage.out` with the Go version from `go.mod`. CI requires
-at least 98% total statement coverage. Process-failure tests use the instrumented
-test binary so Go records the actual child-process coverage.
+at least 98% total statement coverage. Tests exercise real startup/SIGTERM
+behavior, readiness and idempotency failure boundaries.
