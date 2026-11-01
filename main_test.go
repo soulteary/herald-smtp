@@ -57,7 +57,7 @@ func TestMainLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	address := listener.Addr().String()
-	config.Port = strings.TrimPrefix(address, "127.0.0.1")
+	config.Port = strings.TrimPrefix(address, "127.0.0.1:")
 	if err := listener.Close(); err != nil {
 		t.Fatal(err)
 	}
