@@ -9,7 +9,7 @@
 
 SMTP email adapter for [Herald](https://github.com/soulteary/herald). Herald forwards verification codes over HTTP to this service; herald-smtp sends email via SMTP. All SMTP credentials and sending logic live in this project only—Herald does not hold any SMTP credentials when using herald-smtp.
 
-The HTTP server uses Fiber v3 and the matching v2 module lines of the Fiber-facing kit packages. Building from source requires Go 1.27.3 or later.
+The HTTP server uses Fiber v3 and compatible kit packages (exact module versions are recorded in `go.mod`). Building from source requires Go 1.27.3 or later.
 
 ## Core Features
 
