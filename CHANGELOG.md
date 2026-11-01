@@ -5,6 +5,8 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-11-02
+
 ### Fixed
 
 - Return a fixed error for malformed request bodies instead of exposing parser
@@ -14,8 +16,8 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ### Changed
 
-- Upgrade `health-kit/v4` from v4.0.2 to v4.0.4; refresh the required Fiber/network
-  dependency graph and module checksums.
+- Include the previously merged health-kit dependency alignment and verified kit
+  maintenance upgrades; refresh required transitive dependencies and checksums.
 
 ## [1.2.5] - 2026-10-22
 
