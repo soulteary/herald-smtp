@@ -631,3 +631,20 @@ func TestSendHandler_DefaultBodyWhenNoCode(t *testing.T) {
 		t.Errorf("body = %q, want %q", captured.Body, expectBody)
 	}
 }
+
+func TestSendFailureCancellationUsesStablePublicMessage(t *testing.T) {
+	app := fiber.New()
+	app.Get("/", func(c fiber.Ctx) error { return sendFailure(c, nil, context.Canceled) })
+	response, err := app.Test(httptest.NewRequest(http.MethodGet, "/", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	var out provider.HTTPSendResponse
+	if err := json.NewDecoder(response.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusInternalServerError || out.OK || out.ErrorMessage != "send canceled" {
+		t.Fatalf("cancellation response: %d %+v", response.StatusCode, out)
+	}
+}

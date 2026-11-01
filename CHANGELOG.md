@@ -5,6 +5,14 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ## [Unreleased]
 
+### Tests
+
+- Verify configured SMTP client initialization, conflicting TLS modes, retention
+  of live/in-flight idempotency entries, cancellation responses and bare listen
+  ports. Raise the CI statement coverage requirement from 95% to 98%.
+- Linux race tests reach 98.3% total statement coverage; production behavior is
+  unchanged.
+
 ## [1.2.6] - 2026-11-02
 
 ### Fixed

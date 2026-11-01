@@ -140,3 +140,29 @@ func TestRouter_Send_200WhenInjectClient(t *testing.T) {
 		t.Errorf("response OK=%v message_id=%q", out.OK, out.MessageID)
 	}
 }
+
+func TestSetupCreatesConfiguredClientAndRejectsConflictingTLS(t *testing.T) {
+	oldHost, oldFrom, oldTLS, oldStartTLS := config.SMTPHost, config.SMTPFrom, config.UseTLS, config.UseStartTLS
+	t.Cleanup(func() {
+		config.SMTPHost, config.SMTPFrom, config.UseTLS, config.UseStartTLS = oldHost, oldFrom, oldTLS, oldStartTLS
+	})
+	config.SMTPHost, config.SMTPFrom = "localhost", "sender@example.com"
+	for _, conflict := range []bool{false, true} {
+		config.UseTLS, config.UseStartTLS = conflict, true
+		app := fiber.New()
+		log := logger.New(logger.Config{Level: logger.Disabled})
+		Setup(app, log)
+		response, err := app.Test(httptest.NewRequest(http.MethodGet, "/readyz", nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := http.StatusOK
+		if conflict {
+			want = http.StatusServiceUnavailable
+		}
+		if response.StatusCode != want {
+			t.Errorf("TLS conflict=%v: status=%d, want %d", conflict, response.StatusCode, want)
+		}
+		_ = response.Body.Close()
+	}
+}

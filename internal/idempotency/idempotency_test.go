@@ -211,3 +211,43 @@ func TestStore_FinishIgnoresUnknownOrMismatchedReservation(t *testing.T) {
 		t.Fatalf("cached result = (%#v, %v, %v), want original hit", value, decision, err)
 	}
 }
+
+func TestCleanupRetainsLiveResponsesAndInFlightOwners(t *testing.T) {
+	s := NewStore(300, 10)
+	for _, key := range []string{"earlier", "later", "expired", "pending"} {
+		if _, decision, err := s.Begin(context.Background(), key, key); err != nil || decision != Proceed {
+			t.Fatalf("reserve %s: %v %v", key, decision, err)
+		}
+		if key != "pending" {
+			s.Finish(key, key, true, "message-"+key)
+		}
+	}
+	s.nextCleanup = time.Time{}
+	if _, decision, err := s.Begin(context.Background(), "earlier", "earlier"); err != nil || decision != Hit {
+		t.Fatalf("scheduled cleanup lost live response: %v %v", decision, err)
+	}
+	expired := s.m["expired"]
+	expired.expiresAt = time.Now().Add(-time.Second)
+	s.m["expired"] = expired
+	s.removeExpired(time.Now())
+	if _, exists := s.m["expired"]; exists {
+		t.Fatal("expired response retained")
+	}
+	if s.earliestExpiry.IsZero() {
+		t.Fatal("live expiry was not preserved for future cleanup")
+	}
+	for _, key := range []string{"earlier", "later"} {
+		value, decision, err := s.Begin(context.Background(), key, key)
+		if err != nil || decision != Hit || value.MessageID != "message-"+key {
+			t.Fatalf("live response %s changed: %+v %v %v", key, value, decision, err)
+		}
+	}
+	if _, decision, err := s.Begin(context.Background(), "pending", "different"); err != nil || decision != Conflict {
+		t.Fatalf("cleanup lost in-flight owner: %v %v", decision, err)
+	}
+	s.Finish("pending", "pending", true, "message-pending")
+	value, decision, err := s.Begin(context.Background(), "pending", "pending")
+	if err != nil || decision != Hit || value.MessageID != "message-pending" {
+		t.Fatalf("owner could not complete: %+v %v %v", value, decision, err)
+	}
+}
