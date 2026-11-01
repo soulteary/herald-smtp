@@ -87,7 +87,9 @@ Version 1 establishes the documented HTTP, configuration, and operational behavi
 
 - Clarify authentication, TLS modes, health checks, idempotency scope, and multi-replica limitations.
 
-[Unreleased]: https://github.com/soulteary/herald-smtp/compare/v1.2.3...HEAD
+[Unreleased]: https://github.com/soulteary/herald-smtp/compare/v1.2.6...HEAD
+[1.2.6]: https://github.com/soulteary/herald-smtp/compare/v1.2.5...v1.2.6
+[1.2.5]: https://github.com/soulteary/herald-smtp/compare/v1.2.4...v1.2.5
 [1.2.3]: https://github.com/soulteary/herald-smtp/compare/v1.2.2...v1.2.3
 [1.0.0]: https://github.com/soulteary/herald-smtp/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/soulteary/herald-smtp/releases/tag/v0.6.0
