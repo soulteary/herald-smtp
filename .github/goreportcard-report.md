@@ -1,11 +1,11 @@
 # Go Report Card
 
-**Grade: A+** (98.5%)
+**Grade: A+** (97.8%)
 
 | Metric | Value |
 | ------ | ----- |
 | Files | 16 |
-| Issues | 2 |
+| Issues | 3 |
 
 ## Checks
 
@@ -13,7 +13,7 @@
 | ----- | ----- |
 | gofmt | 100% |
 | go_vet | 100% |
-| gocyclo | 87% |
+| gocyclo | 81% |
 | ineffassign | 100% |
 | license | 100% |
 | misspell | 100% |
@@ -24,6 +24,8 @@
 
 - `internal/smtp/integration_test.go`
   - Line 44: cyclomatic complexity 24 for function (*smtpTestServer).serve
+- `internal/idempotency/idempotency_test.go`
+  - Line 215: cyclomatic complexity 18 for function TestCleanupRetainsLiveResponsesAndInFlightOwners
 - `internal/handler/send.go`
   - Line 28: cyclomatic complexity 16 for function SendHandler
 
