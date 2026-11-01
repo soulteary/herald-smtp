@@ -58,3 +58,34 @@ func TestFrameworkErrorHandlerMapsRequestEntityTooLarge(t *testing.T) {
 		t.Fatalf("response = %#v, want invalid_request", out)
 	}
 }
+
+func TestFrameworkErrorsKeepStablePublicMessages(t *testing.T) {
+	for _, tt := range []struct {
+		status        int
+		code, message string
+	}{
+		{400, "invalid_request", "invalid request"},
+		{401, "unauthorized", "unauthorized"},
+		{405, "method_not_allowed", "method not allowed"},
+		{415, "invalid_request", "unsupported media type"},
+		{429, "rate_limited", "rate limited"},
+		{500, "send_failed", "internal server error"},
+	} {
+		t.Run(tt.code+tt.message, func(t *testing.T) {
+			app := fiber.New(fiber.Config{ErrorHandler: FrameworkErrorHandler})
+			app.Get("/", func(c fiber.Ctx) error { return fiber.NewError(tt.status, "private upstream detail") })
+			resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/", nil))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			var out provider.HTTPSendResponse
+			if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != tt.status || out.OK || out.ErrorCode != tt.code || out.ErrorMessage != tt.message {
+				t.Fatalf("response: %d %+v", resp.StatusCode, out)
+			}
+		})
+	}
+}

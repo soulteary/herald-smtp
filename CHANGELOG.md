@@ -5,6 +5,13 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Return a fixed error for malformed request bodies instead of exposing parser
+  diagnostics in HTTP responses and logs. JSON field names and XML entities can
+  contain sensitive request content. Existing logs are not rewritten; see the
+  security guide for retention and credential rotation requirements.
+
 ### Changed
 
 - Upgrade `health-kit/v4` from v4.0.2 to v4.0.4; refresh the required Fiber/network
