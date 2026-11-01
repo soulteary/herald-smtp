@@ -5,6 +5,8 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-11-02
+
 ### Tests
 
 - Verify configured SMTP client initialization, conflicting TLS modes, retention
@@ -95,7 +97,8 @@ Version 1 establishes the documented HTTP, configuration, and operational behavi
 
 - Clarify authentication, TLS modes, health checks, idempotency scope, and multi-replica limitations.
 
-[Unreleased]: https://github.com/soulteary/herald-smtp/compare/v1.2.6...HEAD
+[Unreleased]: https://github.com/soulteary/herald-smtp/compare/v1.2.7...HEAD
+[1.2.7]: https://github.com/soulteary/herald-smtp/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/soulteary/herald-smtp/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/soulteary/herald-smtp/compare/v1.2.4...v1.2.5
 [1.2.3]: https://github.com/soulteary/herald-smtp/compare/v1.2.2...v1.2.3

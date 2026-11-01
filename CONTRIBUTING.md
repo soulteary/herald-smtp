@@ -25,3 +25,10 @@ Thank you for your interest in contributing to herald-smtp.
 ## Questions
 
 Open an [Issue](https://github.com/soulteary/herald-smtp/issues) for questions or bug reports.
+
+## Linux verification
+
+Run `go test -race -count=1 -coverprofile=coverage.out ./...` and
+`go tool cover -func=coverage.out` with the Go version from `go.mod`. CI requires
+at least 98% total statement coverage. Tests exercise real startup/SIGTERM
+behavior, readiness and idempotency failure boundaries.
