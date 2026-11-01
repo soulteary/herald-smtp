@@ -103,7 +103,7 @@ curl -sS -X POST http://localhost:8084/v1/send \
 }
 ```
 
-未提供幂等键时，`message_id` 由 SMTP Provider 生成；提供幂等键时，provider-kit v1.5.0 会将该 key 作为 `message_id` 返回，缓存响应也返回相同值。应将其视为不透明的关联标识，而不是邮件最终投递成功的证明。
+未提供幂等键时，`message_id` 由 SMTP Provider 生成；提供幂等键时，provider-kit 会将该 key 作为 `message_id` 返回，缓存响应也返回相同值。应将其视为不透明的关联标识，而不是邮件最终投递成功的证明。
 
 **失败响应：**
 ```json
@@ -146,3 +146,5 @@ curl -sS -X POST http://localhost:8084/v1/send \
 ## SMTP 并发
 
 `SMTP_MAX_CONCURRENT_SENDS` 限制同时调用 SMTP Provider 的数量（默认 16）。限制仅在当前进程内生效，并且不会阻塞等待：所有槽位均被占用时，新请求会立即收到 `429 rate_limited`。服务不会建立无界 SMTP 发送队列。
+
+畸形正文解析错误使用固定消息 `invalid request body`，不返回解析器细节。

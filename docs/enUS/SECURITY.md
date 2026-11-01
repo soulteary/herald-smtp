@@ -44,3 +44,17 @@ Starting with v1.0.0, security fixes are provided for the current `1.x` release 
 - Use `API_KEY` in production and keep it secret; configure Herald with `HERALD_SMTP_API_KEY` to match.
 - Store SMTP credentials in env or a secret manager; never in code or committed config.
 - Prefer private network and HTTPS in front of herald-smtp; do not expose it publicly without protection.
+
+### Malformed request diagnostics
+
+Malformed JSON and XML bodies return `invalid_request` (HTTP 400) with the fixed
+message `invalid request body`. Raw parser diagnostics are not logged or returned.
+Authentication requirements, accepted body formats and idempotency-key validation
+are unchanged. No data migration or persistent volume is required for this fix.
+Upgrade every replica; old replicas can still disclose malformed body fragments.
+Rolling back restores that exposure.
+
+Historical logs and exported copies are not automatically rewritten. Restrict
+access, review retention, and delete or redact affected logs and exports under
+your retention policy. Rotate credentials if they were included in exposed
+fragments; treat any exposed verification codes as compromised.

@@ -9,7 +9,7 @@
 
 herald-smtp 是 [Herald](https://github.com/soulteary/herald) 的 SMTP 邮件适配器。Herald 通过 HTTP 将验证码发送请求转发到本服务，本服务再通过 SMTP 发送邮件。使用 herald-smtp 时，所有 SMTP 凭证与发送逻辑仅存在于本项目中，Herald 不保存任何 SMTP 凭证。
 
-HTTP 服务使用 Fiber v3 及与之匹配的 Fiber 相关 kit v2 模块版本。从源码构建需要 Go 1.27.3 或更高版本。
+HTTP 服务使用 Fiber v3 及兼容的 kit 包（精确模块版本见 `go.mod`）。从源码构建需要 Go 1.27.3 或更高版本。
 
 ## 核心特性
 

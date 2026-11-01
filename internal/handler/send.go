@@ -121,7 +121,7 @@ func authorized(c fiber.Ctx) bool {
 func parseRequest(c fiber.Ctx) (provider.HTTPSendRequest, error) {
 	var req provider.HTTPSendRequest
 	if err := c.Bind().Body(&req); err != nil {
-		return req, err
+		return req, errors.New("invalid request body")
 	}
 	headerKey := c.Get("Idempotency-Key")
 	if req.IdempotencyKey != "" && headerKey != "" && req.IdempotencyKey != headerKey {
