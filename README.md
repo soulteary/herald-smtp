@@ -18,7 +18,7 @@ The HTTP server uses Fiber v3 and compatible kit packages (exact module versions
 - **Idempotency**: Supports `Idempotency-Key` (or body `idempotency_key`, maximum 256 bytes); requests with the same key and content share one SMTP send within a single process, and successful results are cached for the configured TTL.
 - **SMTP transport modes**: Supports plaintext SMTP, STARTTLS, and implicit TLS with bounded send timeouts.
 - **Bounded SMTP concurrency**: Limits simultaneous SMTP sends with `SMTP_MAX_CONCURRENT_SENDS`; excess requests fail immediately with `429 rate_limited` instead of building an unbounded queue.
-- **Graceful shutdown**: On `SIGINT` or `SIGTERM`, the server stops accepting new requests and waits up to `SHUTDOWN_TIMEOUT_SECONDS`. The effective timeout is never shorter than `SMTP_TIMEOUT_SECONDS + 5` seconds.
+- **Graceful shutdown**: On `SIGINT` or `SIGTERM`, the server stops accepting new requests and waits up to `SHUTDOWN_TIMEOUT_SECONDS`. The effective timeout is never shorter than `SMTP_TIMEOUT_SECONDS + 5` seconds. Successful shutdown exits 0; shutdown failure (including deadline expiry) logs `shutdown error` and exits 1 from v1.2.8. See the deployment guide for supervisor, retry and rollback requirements.
 
 ## v1 Compatibility
 
@@ -117,13 +117,13 @@ Replace the example host, credentials, sender, recipient, and API key before use
 ### Run with Docker
 
 ```bash
-docker pull ghcr.io/soulteary/herald-smtp:v1.2.7
+docker pull ghcr.io/soulteary/herald-smtp:v1.2.8
 docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.2.7
+  ghcr.io/soulteary/herald-smtp:v1.2.8
 ```
 
 Optional: add `-e API_KEY=your_shared_secret` and set `HERALD_SMTP_API_KEY` to the same value on Herald.

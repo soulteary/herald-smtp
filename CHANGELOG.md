@@ -5,6 +5,18 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ## [Unreleased]
 
+## [1.2.8] - 2026-11-02
+
+### Fixed
+
+- Exit with status 1 when HTTP shutdown fails, including a deadline, instead of
+  returning success after the existing `shutdown error` warning. Normal drain
+  still exits 0. API/configuration, warning fields/level and stored records are
+  unchanged; review supervisor restart policy and reconcile uncertain operations
+  before retrying. Rollback restores the old failure exit status.
+- Add a real subprocess regression that requires the shutdown diagnostic and
+  exit status 1, with standard Go child coverage instrumentation.
+
 ## [1.2.7] - 2026-11-02
 
 ### Tests
@@ -97,7 +109,8 @@ Version 1 establishes the documented HTTP, configuration, and operational behavi
 
 - Clarify authentication, TLS modes, health checks, idempotency scope, and multi-replica limitations.
 
-[Unreleased]: https://github.com/soulteary/herald-smtp/compare/v1.2.7...HEAD
+[Unreleased]: https://github.com/soulteary/herald-smtp/compare/v1.2.8...HEAD
+[1.2.8]: https://github.com/soulteary/herald-smtp/compare/v1.2.7...v1.2.8
 [1.2.7]: https://github.com/soulteary/herald-smtp/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/soulteary/herald-smtp/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/soulteary/herald-smtp/compare/v1.2.4...v1.2.5
