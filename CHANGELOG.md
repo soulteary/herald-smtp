@@ -17,6 +17,11 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 - Add a real subprocess regression that requires the shutdown diagnostic and
   exit status 1, with standard Go child coverage instrumentation.
 
+### Documentation
+
+- Give container stop-grace examples margin beyond the unchanged application
+  shutdown budget so forced termination does not preempt failure reporting.
+
 ## [1.2.7] - 2026-11-02
 
 ### Tests

@@ -118,7 +118,7 @@ Replace the example host, credentials, sender, recipient, and API key before use
 
 ```bash
 docker pull ghcr.io/soulteary/herald-smtp:v1.2.8
-docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=45 \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
@@ -127,7 +127,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
 ```
 
 Optional: add `-e API_KEY=your_shared_secret` and set `HERALD_SMTP_API_KEY` to the same value on Herald.
-For production, pin an exact release tag rather than `latest`. If `SMTP_TIMEOUT_SECONDS` makes the effective shutdown timeout exceed 40 seconds, increase `--stop-timeout` to match.
+For production, pin an exact release tag rather than `latest`. The example grants 45 seconds for the default 40-second application shutdown budget. Keep the runtime grace period longer than the effective budget, with scheduling/logging margin; increase it when changing the application timeout.
 
 > **Scaling note:** idempotency state is held in process memory. Multiple replicas do not share cached keys, so the same request routed to different replicas can be sent more than once. Use one replica unless the caller provides a shared idempotency layer.
 
