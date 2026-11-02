@@ -19,7 +19,7 @@ go build -o herald-smtp .
 docker pull ghcr.io/soulteary/herald-smtp:v1.2.8
 
 # 运行并传入环境变量
-docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=45 \
   --health-cmd='curl -fsS http://localhost:8084/healthz || exit 1' \
   --health-interval=30s --health-timeout=3s \
   -e SMTP_HOST=smtp.example.com \
@@ -37,7 +37,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
 services:
   herald-smtp:
     image: ghcr.io/soulteary/herald-smtp:v1.2.8
-    stop_grace_period: 40s
+    stop_grace_period: 45s
     ports:
       - "8084:8084"
     environment:
@@ -62,7 +62,7 @@ services:
 可选：若在 herald-smtp 上配置了 `API_KEY`，传入该值并在 Herald 侧将 `HERALD_SMTP_API_KEY` 设为相同值：
 
 ```bash
-docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=45 \
   -e API_KEY=your_shared_secret \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
@@ -121,7 +121,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
 - `/healthz` 是**存活检查**，仅确认 HTTP 进程能够响应，不检查 SMTP 配置、认证、网络连通性或最终投递。
 - `/readyz` 是**就绪检查**，仅在 SMTP Client 已根据有效本地配置完成初始化时返回成功；它不会测试 SMTP 网络连通性或最终投递。
 - 收到 `SIGINT` 或 `SIGTERM` 后，服务停止接收新请求，并按 `SHUTDOWN_TIMEOUT_SECONDS` 等待 HTTP 关闭。实际关闭超时不会短于 `SMTP_TIMEOUT_SECONDS + 5` 秒，以便进行中的发送能够完成。
-- 容器运行时或进程管理器在发送 `SIGKILL` 前的等待时间必须不少于实际关闭超时。示例将两者都设为 40 秒；若实际关闭超时更长，应同步增大 `--stop-timeout` 或 `stop_grace_period`。
+- 容器运行时或进程管理器的关闭宽限应长于应用实际关闭预算，并为调度和日志输出留余量。示例为默认 40 秒应用预算设置 45 秒运行时宽限；应用预算增加时，应同步增大 `--stop-timeout` 或 `stop_grace_period`。两者截止时间相同可能使 `SIGKILL` 抢在警告和退出码 1 前发生，强制终止不能视为排空成功。
 
 ## 副本与幂等模型
 

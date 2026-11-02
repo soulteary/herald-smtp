@@ -19,7 +19,7 @@ go build -o herald-smtp .
 docker pull ghcr.io/soulteary/herald-smtp:v1.2.8
 
 # Run with env vars
-docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=45 \
   --health-cmd='curl -fsS http://localhost:8084/healthz || exit 1' \
   --health-interval=30s --health-timeout=3s \
   -e SMTP_HOST=smtp.example.com \
@@ -34,7 +34,7 @@ To build the current source instead, run `docker build -t herald-smtp:local .` a
 Optional: if you use `API_KEY` on herald-smtp, pass it and use the same value in Herald as `HERALD_SMTP_API_KEY`:
 
 ```bash
-docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=45 \
   -e API_KEY=your_shared_secret \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
@@ -51,7 +51,7 @@ Minimal example for herald-smtp only:
 services:
   herald-smtp:
     image: ghcr.io/soulteary/herald-smtp:v1.2.8
-    stop_grace_period: 40s
+    stop_grace_period: 45s
     ports:
       - "8084:8084"
     environment:
@@ -123,7 +123,7 @@ Keep `SMTP_SKIP_TLS_VERIFY=false` outside isolated development environments.
 - `/healthz` is a **liveness** endpoint. It confirms that the HTTP process can respond, but it does not check SMTP configuration, authentication, connectivity, or delivery.
 - `/readyz` is a **readiness** endpoint. It returns success only when the SMTP client was initialized from valid local configuration; it does not test SMTP network connectivity or delivery.
 - On `SIGINT` or `SIGTERM`, the server stops accepting new requests and waits up to `SHUTDOWN_TIMEOUT_SECONDS` for HTTP shutdown. The effective timeout is never shorter than `SMTP_TIMEOUT_SECONDS + 5` seconds, allowing in-flight sends to finish.
-- Configure the container runtime or process supervisor to wait at least as long as the effective shutdown timeout before sending `SIGKILL`. The examples use 40 seconds for both settings; increase `--stop-timeout` or `stop_grace_period` whenever the effective shutdown timeout is higher.
+- Give the container runtime or process supervisor a grace period longer than the effective application shutdown budget, with margin for scheduling and logging. The examples use 45 seconds for the default 40-second application budget. Increase `--stop-timeout` or `stop_grace_period` when the application budget increases. Matching the two deadlines can let `SIGKILL` preempt the warning and exit status 1; forced termination is not successful drain.
 
 ## Replica and Idempotency Model
 

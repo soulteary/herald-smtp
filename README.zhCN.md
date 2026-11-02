@@ -118,7 +118,7 @@ curl -sS -X POST http://localhost:8084/v1/send \
 
 ```bash
 docker pull ghcr.io/soulteary/herald-smtp:v1.2.8
-docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
+docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=45 \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
@@ -127,7 +127,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
 ```
 
 可选：增加 `-e API_KEY=your_shared_secret`，并在 Herald 侧将 `HERALD_SMTP_API_KEY` 设为相同值。
-生产环境应固定使用具体版本标签，而不是 `latest`。如果 `SMTP_TIMEOUT_SECONDS` 使实际关闭超时超过 40 秒，应同步增大 `--stop-timeout`。
+生产环境应固定使用具体版本标签，而不是 `latest`。示例为默认 40 秒应用关闭预算设置 45 秒运行时宽限。运行时宽限应长于实际预算，并为调度与日志输出留余量；修改应用超时时应同步调整。
 
 > **扩容说明：** 幂等状态保存在进程内存中。多个副本之间不共享缓存，同一请求被路由到不同实例时仍可能重复发送。除非调用方提供共享幂等层，否则建议运行单副本。
 
