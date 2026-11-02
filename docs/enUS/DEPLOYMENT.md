@@ -16,7 +16,7 @@ go build -o herald-smtp .
 
 ```bash
 # Pull a fixed release
-docker pull ghcr.io/soulteary/herald-smtp:v1.2.7
+docker pull ghcr.io/soulteary/herald-smtp:v1.2.8
 
 # Run with env vars
 docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
@@ -26,7 +26,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.2.7
+  ghcr.io/soulteary/herald-smtp:v1.2.8
 ```
 
 To build the current source instead, run `docker build -t herald-smtp:local .` and substitute `herald-smtp:local` for the image name. Use a fixed release tag in production rather than `latest`.
@@ -40,7 +40,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.2.7
+  ghcr.io/soulteary/herald-smtp:v1.2.8
 ```
 
 ### Docker Compose (example)
@@ -50,7 +50,7 @@ Minimal example for herald-smtp only:
 ```yaml
 services:
   herald-smtp:
-    image: ghcr.io/soulteary/herald-smtp:v1.2.7
+    image: ghcr.io/soulteary/herald-smtp:v1.2.8
     stop_grace_period: 40s
     ports:
       - "8084:8084"
@@ -139,3 +139,7 @@ Herald calls herald-smtp over HTTP when the OTP channel is `email` and `HERALD_S
 When `HERALD_SMTP_API_URL` is set, Herald does not use built-in SMTP (no `SMTP_HOST` in Herald). All SMTP credentials live only in herald-smtp.
 
 Herald should reuse one stable idempotency key for retries of the same logical send and must not reuse that key for different recipients or content.
+
+## Shutdown exit status and upgrades
+
+From v1.2.8, successful signal-driven shutdown exits 0; any error from HTTP shutdown, including its deadline, logs the existing `shutdown error` warning and exits 1. The message, log fields/level, signal handling and shutdown budget are unchanged. This corrects failure reporting, not authentication, delivery or replay protection. A supervisor using restart-on-failure may now restart after a failed shutdown; check its policy and grace period. An unfinished operation may already have committed or been accepted upstream: reconcile uncertain results before retrying. No API, configuration, record format, migration or new mixed-version restriction is introduced; mixed versions differ in failure exit status. Rolling replacement needs no special order from v1.2.7. Rollback restores the misleading zero exit on shutdown failure and must retain warning-based monitoring.

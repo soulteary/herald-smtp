@@ -18,7 +18,7 @@ HTTP 服务使用 Fiber v3 及兼容的 kit 包（精确模块版本见 `go.mod`
 - **幂等**：支持 `Idempotency-Key`（或 body 中的 `idempotency_key`，最长 256 字节）；在单个进程内，相同 key 和内容的请求共用一次 SMTP 发送，成功结果在配置的 TTL 内缓存。
 - **SMTP 传输模式**：支持明文 SMTP、STARTTLS 和隐式 TLS，并对完整发送过程设置超时。
 - **SMTP 并发边界**：通过 `SMTP_MAX_CONCURRENT_SENDS` 限制同时发送数量；容量用尽时立即返回 `429 rate_limited`，不会形成无界等待队列。
-- **优雅关闭**：收到 `SIGINT` 或 `SIGTERM` 后停止接收新请求，并按 `SHUTDOWN_TIMEOUT_SECONDS` 等待；实际超时不会短于 `SMTP_TIMEOUT_SECONDS + 5` 秒。
+- **优雅关闭**：收到 `SIGINT` 或 `SIGTERM` 后停止接收新请求，并按 `SHUTDOWN_TIMEOUT_SECONDS` 等待；实际超时不会短于 `SMTP_TIMEOUT_SECONDS + 5` 秒。 从 v1.2.8 起，正常关闭退出 0，关闭失败（包括超过截止时间）记录 `shutdown error` 并退出 1；进程管理、重试与回滚要求见部署指南。
 
 ## v1 兼容性
 
@@ -117,13 +117,13 @@ curl -sS -X POST http://localhost:8084/v1/send \
 ### 使用 Docker 运行
 
 ```bash
-docker pull ghcr.io/soulteary/herald-smtp:v1.2.7
+docker pull ghcr.io/soulteary/herald-smtp:v1.2.8
 docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_HOST=smtp.example.com \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.2.7
+  ghcr.io/soulteary/herald-smtp:v1.2.8
 ```
 
 可选：增加 `-e API_KEY=your_shared_secret`，并在 Herald 侧将 `HERALD_SMTP_API_KEY` 设为相同值。

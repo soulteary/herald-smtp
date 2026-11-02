@@ -174,3 +174,7 @@ Do not use secrets or personal data as idempotency keys. A supplied key can be r
 Idempotency cache TTL is controlled by `IDEMPOTENCY_TTL_SECONDS` (default 300). After TTL, the same key is treated as a new request and may trigger a new send.
 
 If every new key returns `429 rate_limited` while existing keys still work, the in-memory store may have reached `IDEMPOTENCY_MAX_ENTRIES` (default 10000). Check the error message to distinguish this from the SMTP concurrency limit.
+
+## Shutdown deadline exceeded
+
+From v1.2.8, successful signal-driven shutdown exits 0; any error from HTTP shutdown, including its deadline, logs the existing `shutdown error` warning and exits 1. The message, log fields/level, signal handling and shutdown budget are unchanged. This corrects failure reporting, not authentication, delivery or replay protection. A supervisor using restart-on-failure may now restart after a failed shutdown; check its policy and grace period. An unfinished operation may already have committed or been accepted upstream: reconcile uncertain results before retrying. No API, configuration, record format, migration or new mixed-version restriction is introduced; mixed versions differ in failure exit status. Rolling replacement needs no special order from v1.2.7. Rollback restores the misleading zero exit on shutdown failure and must retain warning-based monitoring.

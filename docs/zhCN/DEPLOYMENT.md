@@ -16,7 +16,7 @@ go build -o herald-smtp .
 
 ```bash
 # 拉取固定版本
-docker pull ghcr.io/soulteary/herald-smtp:v1.2.7
+docker pull ghcr.io/soulteary/herald-smtp:v1.2.8
 
 # 运行并传入环境变量
 docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
@@ -26,7 +26,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.2.7
+  ghcr.io/soulteary/herald-smtp:v1.2.8
 ```
 
 如需构建当前源码，可运行 `docker build -t herald-smtp:local .`，并将示例中的镜像名替换为 `herald-smtp:local`。生产环境应固定使用具体版本标签，而不是 `latest`。
@@ -36,7 +36,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
 ```yaml
 services:
   herald-smtp:
-    image: ghcr.io/soulteary/herald-smtp:v1.2.7
+    image: ghcr.io/soulteary/herald-smtp:v1.2.8
     stop_grace_period: 40s
     ports:
       - "8084:8084"
@@ -68,7 +68,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.2.7
+  ghcr.io/soulteary/herald-smtp:v1.2.8
 ```
 
 ## 配置
@@ -137,3 +137,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=40 \
 设置 `HERALD_SMTP_API_URL` 后，Herald 不再使用内置 SMTP（Herald 中无需配置 `SMTP_HOST`）。所有 SMTP 凭证仅存在于 herald-smtp。
 
 Herald 对同一次逻辑发送的重试应复用稳定的幂等 key，不得将同一 key 用于不同收件人或不同内容。
+
+## 关闭退出码与升级
+
+从 v1.2.8 起，信号触发的正常关闭仍退出 0；HTTP 关闭返回任何错误（包括超过截止时间）时，保留原有 `shutdown error` 警告并退出 1。日志消息、字段和级别、信号处理及关闭预算不变。这修正的是失败状态报告，不改变认证、投递或重放保护。使用失败重启策略的进程管理器可能因此重启，应核对策略与关闭宽限时间。未完成操作可能已提交或被上游接收，重试前必须核对不确定结果。不新增 API、配置、记录格式、迁移或混合版本限制；混合版本的关闭失败退出码不同。从 v1.2.7 滚动替换无特殊顺序要求。回滚会恢复关闭失败仍退出 0 的旧行为，须保留基于警告日志的监控。
