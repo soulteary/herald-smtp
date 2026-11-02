@@ -1,24 +1,24 @@
 {
   "schema_version": "1.0",
   "tests": {
-    "total": 64,
-    "passed": 64,
+    "total": 65,
+    "passed": 65,
     "failed": 0,
     "skipped": 0
   },
   "coverage": {
-    "covered_statements": 281,
-    "total_statements": 286,
-    "percentage": 98.25,
+    "covered_statements": 283,
+    "total_statements": 287,
+    "percentage": 98.61,
     "threshold": 0
   },
   "packages": [
     {
       "name": ".",
       "status": "pass",
-      "tests": 2,
+      "tests": 3,
       "failed": 0,
-      "coverage": 91.67
+      "coverage": 96
     },
     {
       "name": "internal/config",
