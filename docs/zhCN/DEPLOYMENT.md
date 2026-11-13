@@ -16,7 +16,7 @@ go build -o herald-smtp .
 
 ```bash
 # 拉取固定版本
-docker pull ghcr.io/soulteary/herald-smtp:v1.2.8
+docker pull ghcr.io/soulteary/herald-smtp:v1.2.9
 
 # 运行并传入环境变量
 docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=45 \
@@ -26,7 +26,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=45 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.2.8
+  ghcr.io/soulteary/herald-smtp:v1.2.9
 ```
 
 如需构建当前源码，可运行 `docker build -t herald-smtp:local .`，并将示例中的镜像名替换为 `herald-smtp:local`。生产环境应固定使用具体版本标签，而不是 `latest`。
@@ -36,7 +36,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=45 \
 ```yaml
 services:
   herald-smtp:
-    image: ghcr.io/soulteary/herald-smtp:v1.2.8
+    image: ghcr.io/soulteary/herald-smtp:v1.2.9
     stop_grace_period: 45s
     ports:
       - "8084:8084"
@@ -68,7 +68,7 @@ docker run -d --name herald-smtp -p 8084:8084 --stop-timeout=45 \
   -e SMTP_FROM=noreply@example.com \
   -e SMTP_USER=user \
   -e SMTP_PASSWORD=secret \
-  ghcr.io/soulteary/herald-smtp:v1.2.8
+  ghcr.io/soulteary/herald-smtp:v1.2.9
 ```
 
 ## 配置

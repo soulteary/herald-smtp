@@ -5,6 +5,22 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ## [Unreleased]
 
+## [1.2.9] - 2026-11-13
+
+### Changed
+
+- Require Go 1.27.4 (previously 1.27.3) in `go.mod` and build the container
+  image with `golang:1.27.4-alpine3.24`. Go 1.27.4 is a security release and
+  includes the net/http fix for GO-2026-6859.
+- Update Fiber from v3.6.1 to v3.7.0.
+- Update kit modules: cli-kit v1.9.3 to v1.9.4, health-kit/v4 v4.0.5 to v4.0.7,
+  logger-kit/v3 v3.0.4 to v3.0.6, provider-kit v1.7.4 to v1.7.5 and
+  version-kit/v4 v4.0.3 to v4.0.5.
+- Refresh indirect modules: gofiber/schema v1.9.2 to v1.9.3, gofiber/utils/v2
+  v2.6.3 to v2.6.4 and fasthttp v1.77.0 to v1.78.0.
+- This release contains no changes to herald-smtp source code; the HTTP API,
+  configuration and delivery behavior are the same as in v1.2.8.
+
 ## [1.2.8] - 2026-11-02
 
 ### Fixed
@@ -114,7 +130,8 @@ Version 1 establishes the documented HTTP, configuration, and operational behavi
 
 - Clarify authentication, TLS modes, health checks, idempotency scope, and multi-replica limitations.
 
-[Unreleased]: https://github.com/soulteary/herald-smtp/compare/v1.2.8...HEAD
+[Unreleased]: https://github.com/soulteary/herald-smtp/compare/v1.2.9...HEAD
+[1.2.9]: https://github.com/soulteary/herald-smtp/compare/v1.2.8...v1.2.9
 [1.2.8]: https://github.com/soulteary/herald-smtp/compare/v1.2.7...v1.2.8
 [1.2.7]: https://github.com/soulteary/herald-smtp/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/soulteary/herald-smtp/compare/v1.2.5...v1.2.6
