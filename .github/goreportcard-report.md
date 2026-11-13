@@ -22,14 +22,14 @@
 
 ### gocyclo
 
-- `internal/smtp/integration_test.go`
-  - Line 44: cyclomatic complexity 24 for function (*smtpTestServer).serve
 - `main_test.go`
   - Line 102: cyclomatic complexity 22 for function TestMainShutdownTimeoutExitsNonzero
 - `internal/idempotency/idempotency_test.go`
   - Line 215: cyclomatic complexity 18 for function TestCleanupRetainsLiveResponsesAndInFlightOwners
 - `internal/handler/send.go`
   - Line 28: cyclomatic complexity 16 for function SendHandler
+- `internal/smtp/integration_test.go`
+  - Line 44: cyclomatic complexity 24 for function (*smtpTestServer).serve
 
 ---
 
