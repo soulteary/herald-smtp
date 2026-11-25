@@ -5,6 +5,18 @@ Notable changes to herald-smtp are recorded in this file. The project follows
 
 ## [Unreleased]
 
+## [1.2.10] - 2026-11-26
+
+### Dependencies
+
+- `github.com/soulteary/health-kit/v4`: `v4.0.9` → `v4.0.10`.
+- `github.com/soulteary/logger-kit/v3`: `v3.0.7` → `v3.0.8`.
+- `github.com/soulteary/version-kit/v4`: `v4.0.6` → `v4.0.7`.
+
+The service API, configuration keys and persisted record formats are unchanged by this dependency refresh. Go remains 1.27.4.
+
+See [upgrade and rollback notes](docs/releases/v1.2.10.md).
+
 ## [1.2.9] - 2026-11-13
 
 ### Changed
